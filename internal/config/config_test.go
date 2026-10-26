@@ -108,6 +108,8 @@ func TestValidationPaths(t *testing.T) {
 		{"log.level", func(c *Config) { c.Log.Level = "invalid" }},
 		{"queue.driver", func(c *Config) { c.Queue.Driver = "redis" }},
 		{"store.driver", func(c *Config) { c.Store.Driver = "s3" }},
+		{"cleaner.interval", func(c *Config) { c.Cleaner.Interval = 0 }},
+		{"cleaner.orphan_grace", func(c *Config) { c.Cleaner.OrphanGrace = -1 }},
 		{"stats.driver", func(c *Config) { c.Stats.Driver = "redis" }},
 		{"runtime.driver", func(c *Config) { c.Runtime.Driver = "kubernetes" }},
 		{"runtime.socket", func(c *Config) { c.Runtime.Socket = "" }},

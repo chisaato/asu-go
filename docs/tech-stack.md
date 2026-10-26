@@ -163,6 +163,8 @@ K8S 预留要点（现在就遵守，避免日后返工）：
 
 `queue.max_concurrent_builds` 默认 2，`job_timeout` 默认 10m，`runtime.memory_limit` / `runtime.cpus` 默认不限，`runtime.pull_policy: missing|always|never` 默认 `missing`。`rolling` source 按 `runtime.rolling_recheck`（默认 6h）强制 always 复查，检查时间保存在 Runner 实例内存，重启后首次使用重新检查。`runtime.scavenger_interval` 默认 5m，启动立即执行一次回收；活跃任务不回收，非活跃诊断环境按保留 TTL/数量清理。一期不自动清理镜像（磁盘风险：每个 target 一份，GB 级），二期在后台存储页手动清理。
 
+`cleaner.interval` 默认 10m，启动立即清理一次；`cleaner.orphan_grace` 默认 1h，仅回收无 jobs 记录的公开 hash 目录。普通产物按 expires_at，日志、任务记录和诊断产物按 purge_at 回收；活跃任务不回收。下载每次检查 jobs 的公开期限，不依赖定时清理。手动删除保留任务记录并标记 `result.artifacts_removed=true`，公开轮询/下载按过期返回 404。
+
 ---
 
 ## 5. 前端（`web/`）

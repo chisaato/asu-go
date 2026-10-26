@@ -6,6 +6,8 @@
 
 `Publisher` 默认使用 `store.Local`，serve 将其与匿名 `/store/*path` 下载路由共用。存储目录由 `store.dir` 指定（默认 `{data_dir}/store`）；旧同哈希产物先移到临时目录，rename 发布失败恢复。Runner 额外导出 `manifest` 与 `build_cmd_packages`，恢复收尾也能构造同一结果。日志接口使用同一个 SQLiteJobStore 与 Hub。
 
+`Cleaner` 与入队/claim/完成共用队列锁，避免旧 hash 清理误删重新提交后的产物。普通产物 expires_at 后回收；日志、jobs、重放产物按 purge_at 保留。下载每次查 jobs 可见性，不依赖扫描间隔；手动删除将结果标记为 artifacts_removed 并撤销公开可见性。详细规则见 `internal/store/README.md`。
+
 ## 与原版的有意差异
 
 - 按设计使用规范 JSON SHA-256，不复刻 Python repr 哈希；源码别名在哈希后解析，jobs.request 保留规范化原请求，冗余 profile 保存实际构建 ID。

@@ -12,4 +12,10 @@ hash 必须为 64 位小写 SHA-256，或 `rp_` 加规范的 26 位大写 ULID�
 
 `store.dir` 留空时动态使用 `{data_dir}/store`；serve 将同一实例交给 queue 与匿名 `/store/*path`。下载保持原版固定 `application/octet-stream`（包括 JSON、文本和 manifest）、附件响应、`nosniff` 与 `{"detail":"Not found"}` 404，另支持 Range 与 If-Modified-Since。S3/未知驱动由配置校验拒绝，一期不返回 S3 重定向。
 
-TTL 选择、数据库/日志回收由后续 Cleaner 实现；存储包不依赖队列或数据库。替换失败自动恢复不等同于断电事务：崩溃遗留的 `.replace-*` 保留供人工恢复，不主动删除潜在的唯一旧副本。
+TTL 选择、数据库/日志回收由 `queue.Cleaner` 实现；存储包不依赖队列或数据库。替换失败自动恢复不等同于断电事务：崩溃遗留的 `.replace-*` 保留供人工恢复，不主动删除潜在的唯一旧副本。
+
+serve 为下载路由注入 `jobs.StoreVisible`，每次 GET/HEAD 查询 jobs，仅 done 且未到 expires_at 的普通任务可以下载；不依赖扫描频率，过期、手动删除、孤儿和重放均返回 404。已打开的下载允许完成。
+
+Cleaner 启动立即执行，之后按 `cleaner.interval`（10m）扫描。普通产物到 expires_at 删除，日志、诊断产物、keep_container 产物和 jobs 到 purge_at 删除；queued/running 永不回收，stat_counters 保留。数据库删除前确保文件清理成功，失败告警并在后续扫描重试（手动标记也触发产物和日志的重试）。无 jobs 记录的公开 hash 目录超过 `cleaner.orphan_grace`（1h）后删除，rp_、隐藏临时目录、符号链接和未知目录不碰。
+
+`DELETE /admin/api/store/{hash}` 在已鉴权管理组注册；不存在 404、queued/running 409。成功删除产物及日志，保留记录与原结果字段、增加 `result.artifacts_removed=true` 并将 expires_at 设为当前时间，使公开轮询和下载均返回与过期一致的 404。重复删除已有记录幂等成功。重放手动删除可立即清理，但自动清理只按 purge_at。

@@ -28,6 +28,7 @@ type Config struct {
 	Queue       Queue       `yaml:"queue"`
 	Build       Build       `yaml:"build"`
 	Store       Store       `yaml:"store"`
+	Cleaner     Cleaner     `yaml:"cleaner"`
 	Stats       Stats       `yaml:"stats"`
 	Runtime     Runtime     `yaml:"runtime"`
 	Metadata    Metadata    `yaml:"metadata"`
@@ -78,6 +79,11 @@ type Store struct {
 	Dir    string `yaml:"dir"`
 }
 
+type Cleaner struct {
+	Interval    time.Duration `yaml:"interval"`
+	OrphanGrace time.Duration `yaml:"orphan_grace"`
+}
+
 // StoreDir 延迟解析默认值，确保 data_dir 的环境变量/flag 覆盖生效。
 func (c Config) StoreDir() string {
 	if c.Store.Dir != "" {
@@ -120,6 +126,7 @@ func Default() Config {
 		Queue:       Queue{Driver: "sqlite", MaxConcurrentBuilds: 2, MaxPendingJobs: 200, JobTimeout: 10 * time.Minute, BuildTTL: 7 * 24 * time.Hour, BuildUnversionedTTL: 24 * time.Hour, BuildDefaultsTTL: 30 * time.Minute, BuildFailureTTL: time.Hour},
 		Build:       Build{MaxDefaultsLength: 20480, MaxCustomRootfsSizeMB: 1024},
 		Store:       Store{Driver: "local"},
+		Cleaner:     Cleaner{Interval: 10 * time.Minute, OrphanGrace: time.Hour},
 		Stats:       Stats{Driver: "sqlite"},
 		Runtime:     Runtime{Driver: "docker", Socket: "unix:///var/run/docker.sock", PullPolicy: "missing", RollingRecheck: 6 * time.Hour, ScavengerInterval: 5 * time.Minute},
 		Metadata:    Metadata{RefreshInterval: time.Hour, CacheTTL: time.Hour},
@@ -240,6 +247,8 @@ func (c Config) Validate() error {
 		return errors.New("runtime.pull_policy: 仅支持 missing、always 或 never")
 	}
 	for path, value := range map[string]time.Duration{
+		"cleaner.interval":               c.Cleaner.Interval,
+		"cleaner.orphan_grace":           c.Cleaner.OrphanGrace,
 		"runtime.rolling_recheck":        c.Runtime.RollingRecheck,
 		"runtime.scavenger_interval":     c.Runtime.ScavengerInterval,
 		"admin.session_ttl":              c.Admin.SessionTTL,
