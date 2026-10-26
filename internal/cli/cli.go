@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/gzzchh/asu-go/internal/config"
+	"github.com/gzzchh/asu-go/internal/db"
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
 )
@@ -51,7 +52,22 @@ func NewCommand() *cobra.Command {
 			return encoder.Encode(cfg)
 		},
 	})
-	root.AddCommand(serve, configCmd, &cobra.Command{Use: "version", Short: "打印版本", Args: cobra.NoArgs,
+	dbCmd := &cobra.Command{Use: "db", Short: "离线数据库管理（要求服务未运行）"}
+	dbCmd.AddCommand(&cobra.Command{Use: "migrate", Short: "执行内嵌迁移（要求服务未运行）", Args: cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			cfg, err := load(cmd)
+			if err != nil {
+				return err
+			}
+			database, err := db.Open(cmd.Context(), cfg.DataDir)
+			if err != nil {
+				return err
+			}
+			defer func() { _ = database.Close() }()
+			return database.Migrate(cmd.Context())
+		},
+	})
+	root.AddCommand(serve, configCmd, dbCmd, &cobra.Command{Use: "version", Short: "打印版本", Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			_, err := fmt.Fprintln(cmd.OutOrStdout(), Version)
 			return err

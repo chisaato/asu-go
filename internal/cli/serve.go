@@ -13,12 +13,16 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/gzzchh/asu-go/internal/config"
+	"github.com/gzzchh/asu-go/internal/db"
 	"github.com/gzzchh/asu-go/internal/logging"
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
 )
 
 func runServe(parent context.Context, cfg config.Config) error {
+	if err := cfg.Validate(); err != nil {
+		return err
+	}
 	logger, err := logging.New(cfg.Log)
 	if err != nil {
 		return err
@@ -27,6 +31,14 @@ func runServe(parent context.Context, cfg config.Config) error {
 	logger = logger.With(zap.String("component", "server"))
 	ctx, stop := signal.NotifyContext(parent, os.Interrupt, syscall.SIGTERM)
 	defer stop()
+	database, err := db.Open(ctx, cfg.DataDir)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = database.Close() }()
+	if err := database.Migrate(ctx); err != nil {
+		return err
+	}
 	gin.SetMode(gin.ReleaseMode)
 	router := gin.New()
 	router.Use(func(c *gin.Context) {
