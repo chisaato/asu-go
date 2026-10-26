@@ -48,6 +48,15 @@ var (
 
 // Validate 先执行模型校验（422），再执行服务端策略（400），最后调用元数据校验。
 func Validate(r Request, limits Limits, metadata ...MetadataValidator) error {
+	return validate(r, limits, false, metadata...)
+}
+
+// ValidateReplay 仅供已鉴权管理端显式绕过策略限制，仍验证字段与元数据。
+func ValidateReplay(r Request, limits Limits, skipLimits bool) error {
+	return validate(r, limits, skipLimits)
+}
+
+func validate(r Request, limits Limits, skipLimits bool, metadata ...MetadataValidator) error {
 	if limits.MaxDefaultsLength == 0 {
 		limits.MaxDefaultsLength = 20480
 	}
@@ -78,10 +87,10 @@ func Validate(r Request, limits Limits, metadata ...MetadataValidator) error {
 			return invalid("packages_versions", "Invalid package name or version")
 		}
 	}
-	if r.Defaults != nil && utf8.RuneCountInString(*r.Defaults) > limits.MaxDefaultsLength {
+	if !skipLimits && r.Defaults != nil && utf8.RuneCountInString(*r.Defaults) > limits.MaxDefaultsLength {
 		return invalid("defaults", "String exceeds max_defaults_length")
 	}
-	if r.RootfsSizeMB != nil && (*r.RootfsSizeMB < 1 || *r.RootfsSizeMB > limits.MaxCustomRootfsSizeMB) {
+	if r.RootfsSizeMB != nil && (*r.RootfsSizeMB < 1 || (!skipLimits && *r.RootfsSizeMB > limits.MaxCustomRootfsSizeMB)) {
 		return invalid("rootfs_size_mb", "Size outside allowed range")
 	}
 	if r.Filesystem != nil && !slices.Contains([]string{"squashfs", "ext4", "ubifs", "erofs", "jffs2", "jffs2-nand", "targz", "cpiogz"}, *r.Filesystem) {
@@ -96,11 +105,11 @@ func Validate(r Request, limits Limits, metadata ...MetadataValidator) error {
 			return invalid("repositories", "Invalid repository name or URL")
 		}
 	}
-	if r.Defaults != nil && *r.Defaults != "" && !limits.AllowDefaults {
+	if !skipLimits && r.Defaults != nil && *r.Defaults != "" && !limits.AllowDefaults {
 		return denied("defaults", "Handling `defaults` not enabled on server")
 	}
 	for _, name := range sortedKeys(r.Repositories) {
-		if !RepositoryAllowed(r.Repositories[name], limits.RepositoryAllowList) {
+		if !skipLimits && !RepositoryAllowed(r.Repositories[name], limits.RepositoryAllowList) {
 			return denied("repositories", "Repository not allowed: "+r.Repositories[name])
 		}
 	}

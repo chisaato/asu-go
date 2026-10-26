@@ -80,6 +80,10 @@ func (r *Runner) Resume(parent context.Context, j Job, h runtime.Handle) (Result
 	}
 	s, err := r.Runtime.Inspect(parent, h)
 	if err != nil {
+		if parent.Err() != nil {
+			// 取消可能先于接管的 Inspect；仍走统一 Kill/Remove 收尾。
+			return r.execute(parent, j, h)
+		}
 		return Result{}, err
 	}
 	if !s.Exists {

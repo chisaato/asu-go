@@ -46,6 +46,7 @@ type SQLite struct {
 	Options   Options
 	mu        sync.Mutex
 	wake      chan struct{}
+	active    map[string]context.CancelFunc
 }
 
 func NewSQLite(db *sql.DB, catalog *sources.Store, meta metadata.ProfileProvider, r *runner.Runner, opts Options) *SQLite {
@@ -413,6 +414,8 @@ func (q *SQLite) claim(ctx context.Context) (string, error) {
 }
 
 func (q *SQLite) execute(ctx context.Context, id string) error {
+	ctx, done := q.ExecutionContext(ctx, id)
+	defer done()
 	job, err := q.job(ctx, id)
 	if job.ArtifactDir != "" {
 		defer func() { _ = os.RemoveAll(job.ArtifactDir) }()
@@ -447,11 +450,13 @@ func (q *SQLite) job(ctx context.Context, id string) (runner.Job, error) {
 	}
 	var opts struct {
 		Packages []string `json:"build_cmd_packages"`
+		ReplayOptions
 	}
 	if err = json.Unmarshal([]byte(options), &opts); err != nil {
 		return runner.Job{}, err
 	}
 	j := runner.Job{ID: id, Image: image, Profile: profile, VersionCode: r.VersionCode, Packages: opts.Packages, PackageVersions: r.PackagesVersions, Repositories: r.Repositories, RepositoriesMode: r.RepositoriesMode, RepositoryKeys: r.RepositoryKeys, Rolling: source.Rolling, ArtifactDir: filepath.Join(q.Options.DataDir, "work", id)}
+	applyReplayOptions(&j, opts.ReplayOptions)
 	j.DiffPackages = r.DiffPackages
 	j.Packages = executionPackages(r, profile)
 	if r.Defaults != nil {

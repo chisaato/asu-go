@@ -178,6 +178,13 @@
 
 ### 2.2 任务监控与运维管理接口 (`/admin/api`)
 
+#### `GET /admin/api/jobs`、`GET /admin/api/jobs/{id}`
+- **列表参数**：`status=all|queued|running|done|failed|finished`，`page` 默认 1，`page_size` 默认 20、最大 200；响应 `{total,items}`，`finished` 包括 done 与 failed。
+- **详情**：返回 `id`、`replay_of`、规范化 `request`、`result`、`stages`、`options`、`error`、任务状态和时间戳，不复用公开轮询响应体；按 `purge_at` 而非 `expires_at` 保留。
+
+#### `POST /admin/api/jobs/{id}/cancel`
+- **行为**：queued 立即转为 failed；running 取消执行 context 并等待 Runner 完成 Kill/Remove。返回 202，任务公开轮询最终为 HTTP 500、`detail: cancelled`，不新增状态值。已结束返回 409，不存在返回 404。重启接管的任务同样支持取消，取消始终清理容器。
+
 #### `GET /admin/api/tasks`
 - **查询参数**：
   - `status`: `all` | `queued` | `running` | `finished` | `failed`
@@ -215,7 +222,9 @@
 
 #### `POST /admin/api/jobs/{request_hash}/replay`、`POST /admin/api/replay`
 - **说明**：诊断重放。前者复用库中已有任务的 `request`；后者直接提交原始 BuildRequest JSON。请求体可选 `options`：`verbose`（默认 true）、`keep_container`（默认 true）、`image_tag`、`pull_policy`。
+- **校验**：默认与公开提交相同；仅管理端 `options.skip_limits=true` 可显式绕过 defaults、大小与仓库白名单策略限制，仍保留字段类型/格式与发行流、target、profile 校验。`options` 与原始 BuildRequest 字段在同一 JSON 对象内；从已有任务重放时可提交 `{ "options": {} }` 或空请求体。
 - **行为**：创建独立 id（`rp_<ulid>`）的任务，`replay_of` 指向原哈希；不去重、不写公开缓存、不计统计。返回新任务 id，之后用 `GET /admin/api/jobs/{id}`、`.../log?follow=1` 观察。
+- **隔离**：直接提交时 `replay_of` 为请求规范哈希；已有任务重放时为来源任务 id。公开 GET/HEAD 始终返回 404；成功诊断产物位于独立 `diagnostics/{id}`，不进入公开 `/store` 命名空间。
 
 #### `DELETE /admin/api/store/{request_hash}`
 - **说明**：手动从磁盘删除指定 Hash 的固件产物与日志。

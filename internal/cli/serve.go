@@ -98,6 +98,7 @@ func runServe(parent context.Context, cfg config.Config) error {
 	artifactStore := &store.Local{Dir: cfg.StoreDir()}
 	jobs.Publisher = artifactStore
 	api.RegisterStore(router, artifactStore)
+	admin.RegisterJobs(adminGroup, jobs)
 	api.RegisterBuild(router, jobs)
 	router.GET("/healthz", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"status": "ok"})
