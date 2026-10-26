@@ -13,9 +13,11 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/gzzchh/asu-go/internal/admin"
+	"github.com/gzzchh/asu-go/internal/api"
 	"github.com/gzzchh/asu-go/internal/config"
 	"github.com/gzzchh/asu-go/internal/db"
 	"github.com/gzzchh/asu-go/internal/logging"
+	"github.com/gzzchh/asu-go/internal/metadata"
 	"github.com/gzzchh/asu-go/internal/sources"
 	"github.com/gzzchh/asu-go/internal/webui"
 	"go.uber.org/zap"
@@ -59,6 +61,8 @@ func runServe(parent context.Context, cfg config.Config) error {
 		c.Next()
 	})
 	admin.RegisterSources(router.Group("/admin/api", admin.RequireAuth(admin.BearerAuthenticator(cfg.Admin.APIToken))), catalog)
+	upstream := metadata.NewClient("asu-go/" + Version)
+	api.RegisterMetadata(router, &metadata.Service{Store: catalog, Client: upstream, Version: Version})
 	router.GET("/healthz", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"status": "ok"})
 	})
@@ -73,6 +77,8 @@ func runServe(parent context.Context, cfg config.Config) error {
 		BaseContext:       func(net.Listener) context.Context { return ctx },
 	}
 	group, groupCtx := errgroup.WithContext(ctx)
+	syncer := &metadata.Syncer{Store: catalog, Client: upstream, Logger: logger.With(zap.String("component", "metadata"))}
+	group.Go(func() error { return syncer.Run(groupCtx, cfg.Metadata.RefreshInterval) })
 	group.Go(func() error {
 		logger.Info("服务已启动", zap.String("listen", listener.Addr().String()))
 		if err := server.Serve(listener); err != nil && !errors.Is(err, http.ErrServerClosed) {
