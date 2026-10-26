@@ -7,6 +7,7 @@ import (
 	"net"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gzzchh/asu-go/internal/queue"
@@ -14,6 +15,7 @@ import (
 	"github.com/gzzchh/asu-go/internal/stats"
 	"github.com/gzzchh/asu-go/internal/store"
 	"go.uber.org/zap/zapcore"
+	"golang.org/x/crypto/bcrypt"
 	"gopkg.in/yaml.v3"
 )
 
@@ -40,7 +42,15 @@ type Log struct {
 }
 
 type Admin struct {
-	APIToken string `yaml:"api_token"`
+	APIToken      string        `yaml:"api_token"`
+	Users         []AdminUser   `yaml:"users"`
+	SessionSecret string        `yaml:"session_secret"`
+	SessionTTL    time.Duration `yaml:"session_ttl"`
+}
+
+type AdminUser struct {
+	Name         string `yaml:"name"`
+	PasswordHash string `yaml:"password_hash"`
 }
 
 type Queue struct {
@@ -80,6 +90,7 @@ func Default() Config {
 		Server:      Server{Listen: ":8000"},
 		Log:         Log{Format: "json", Level: "info"},
 		DataDir:     "data",
+		Admin:       Admin{SessionTTL: 24 * time.Hour},
 		Queue:       Queue{Driver: "sqlite", MaxConcurrentBuilds: 2, JobTimeout: 10 * time.Minute},
 		Store:       Store{Driver: "local"},
 		Stats:       Stats{Driver: "sqlite"},
@@ -173,6 +184,16 @@ func (c Config) Validate() error {
 	if c.DataDir == "" {
 		return errors.New("data_dir: 不得为空")
 	}
+	seen := make(map[string]bool)
+	for i, user := range c.Admin.Users {
+		if strings.TrimSpace(user.Name) == "" || seen[user.Name] {
+			return fmt.Errorf("admin.users[%d].name: 不得为空或重复", i)
+		}
+		seen[user.Name] = true
+		if _, err := bcrypt.Cost([]byte(user.PasswordHash)); err != nil {
+			return fmt.Errorf("admin.users[%d].password_hash: 必须为 bcrypt 哈希: %w", i, err)
+		}
+	}
 	if _, err := queue.Lookup(c.Queue.Driver); err != nil {
 		return fmt.Errorf("queue.driver: %w", err)
 	}
@@ -192,6 +213,7 @@ func (c Config) Validate() error {
 		return errors.New("runtime.pull_policy: 仅支持 missing、always 或 never")
 	}
 	for path, value := range map[string]time.Duration{
+		"admin.session_ttl":              c.Admin.SessionTTL,
 		"queue.job_timeout":              c.Queue.JobTimeout,
 		"metadata.refresh_interval":      c.Metadata.RefreshInterval,
 		"diagnostics.retention":          c.Diagnostics.Retention,

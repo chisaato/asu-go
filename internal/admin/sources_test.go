@@ -35,7 +35,7 @@ func TestAuth(t *testing.T) {
 		status             int
 	}{
 		{"secret", "", 401}, {"secret", "Bearer wrong", 401}, {"secret", "Basic secret", 401},
-		{"secret", "Bearer secret", 200}, {"", "", 503}, {"", "Bearer anything", 503}, {" ", "Bearer anything", 503},
+		{"secret", "Bearer secret", 200}, {"", "", 401}, {"", "Bearer anything", 401}, {" ", "Bearer anything", 401},
 	} {
 		router := testRouter(t, tc.configured)
 		request := httptest.NewRequest(http.MethodGet, "/admin/api/sources", nil)
