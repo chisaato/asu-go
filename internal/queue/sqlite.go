@@ -140,7 +140,11 @@ func (q *SQLite) Submit(ctx context.Context, r buildreq.Request, userAgent strin
 	if err != nil {
 		return Response{}, err
 	}
-	packages := selectedPackages(r, profile)
+	resolved, _ := profile["id"].(string)
+	if resolved == "" {
+		resolved = r.Profile
+	}
+	packages := executionPackages(r, resolved)
 	extra := []string{}
 	defaults := profilePackages(profile)
 	for _, p := range packages {
@@ -185,10 +189,6 @@ func (q *SQLite) Submit(ctx context.Context, r buildreq.Request, userAgent strin
 	// 同主键的过期记录可再次构建；删除仅限已完成记录，物理清理由 store-ttl 接续。
 	if _, err = tx.ExecContext(ctx, `DELETE FROM jobs WHERE request_hash=?`, id); err != nil {
 		return Response{}, err
-	}
-	resolved, _ := profile["id"].(string)
-	if resolved == "" {
-		resolved = r.Profile
 	}
 	_, err = tx.ExecContext(ctx, `INSERT INTO jobs(request_hash,source_id,version,target,profile,status,stage,enqueued_at,expires_at,purge_at,client,request,options) VALUES(?,?,?,?,?,'queued','init',?,?,?,?,?,?)`, id, source.ID, r.Version, r.Target, resolved, now, now.Add(q.ttl(r)), now.Add(q.Options.Retention), r.Client, string(data), string(options))
 	if err != nil {
@@ -452,9 +452,7 @@ func (q *SQLite) job(ctx context.Context, id string) (runner.Job, error) {
 	}
 	j := runner.Job{ID: id, Image: image, Profile: profile, VersionCode: r.VersionCode, Packages: opts.Packages, PackageVersions: r.PackagesVersions, Repositories: r.Repositories, RepositoriesMode: r.RepositoriesMode, RepositoryKeys: r.RepositoryKeys, Rolling: source.Rolling, ArtifactDir: filepath.Join(q.Options.DataDir, "work", id)}
 	j.DiffPackages = r.DiffPackages
-	if j.DiffPackages {
-		j.Packages = selectedPackages(r, nil)
-	}
+	j.Packages = executionPackages(r, profile)
 	if r.Defaults != nil {
 		j.Defaults = *r.Defaults
 	}
