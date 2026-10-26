@@ -4,7 +4,7 @@
 
 **Blocked by:** foundation/02
 
-**Status:** ready-for-human
+**Status:** done
 
 - [x] 内嵌默认目录首次启动入库，镜像基名 + tag 模板（OpenWrt/ImmortalWrt 规则以实测 tag 为准）
 - [x] `/admin/api/sources` CRUD，`admin.api_token` 鉴权中间件
