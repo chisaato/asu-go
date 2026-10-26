@@ -4,7 +4,7 @@
 
 公开接口：`POST /api/v1/build`、`GET|HEAD /api/v1/build/:hash`、`GET /api/v1/stats`。队列位置从 0 开始，与原版 RQ 一致；所有任务响应含 `enqueued_at`、`request_hash` 与两种状态头。失败及成功缓存到期对客户端不可见，queued/running 不因等待超过 TTL 而重复执行。
 
-`DirectoryPublisher` 只负责 rename 到 `store/{hash}`，旧同哈希产物先移到临时目录，发布失败恢复；不实现下载路由或 TTL 清理。Runner 额外导出 `manifest` 与 `build_cmd_packages`，恢复收尾也能构造同一结果。日志接口使用同一个 SQLiteJobStore 与 Hub。
+`Publisher` 默认使用 `store.Local`，serve 将其与匿名 `/store/*path` 下载路由共用。存储目录由 `store.dir` 指定（默认 `{data_dir}/store`）；旧同哈希产物先移到临时目录，rename 发布失败恢复。Runner 额外导出 `manifest` 与 `build_cmd_packages`，恢复收尾也能构造同一结果。日志接口使用同一个 SQLiteJobStore 与 Hub。
 
 ## 与原版的有意差异
 

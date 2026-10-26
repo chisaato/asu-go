@@ -33,6 +33,8 @@ build:
   repository_allow_list: null
 store:
   driver: local
+  # 留空时跟随 data_dir，使用 {data_dir}/store。
+  dir: ""
 stats:
   driver: sqlite
 runtime:

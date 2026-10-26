@@ -6,6 +6,7 @@ import (
 	"io"
 	"net"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -74,6 +75,15 @@ type Build struct {
 
 type Store struct {
 	Driver string `yaml:"driver"`
+	Dir    string `yaml:"dir"`
+}
+
+// StoreDir 延迟解析默认值，确保 data_dir 的环境变量/flag 覆盖生效。
+func (c Config) StoreDir() string {
+	if c.Store.Dir != "" {
+		return c.Store.Dir
+	}
+	return filepath.Join(c.DataDir, "store")
 }
 
 type Stats struct {

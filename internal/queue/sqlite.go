@@ -18,6 +18,7 @@ import (
 	"github.com/gzzchh/asu-go/internal/runner"
 	"github.com/gzzchh/asu-go/internal/runtime"
 	"github.com/gzzchh/asu-go/internal/sources"
+	"github.com/gzzchh/asu-go/internal/store"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -48,7 +49,7 @@ type SQLite struct {
 }
 
 func NewSQLite(db *sql.DB, catalog *sources.Store, meta metadata.ProfileProvider, r *runner.Runner, opts Options) *SQLite {
-	return &SQLite{SQLiteJobStore: &runner.SQLiteJobStore{DB: db}, Sources: catalog, Metadata: meta, Runner: r, Options: opts, Publisher: DirectoryPublisher{Root: filepath.Join(opts.DataDir, "store")}, wake: make(chan struct{}, 1)}
+	return &SQLite{SQLiteJobStore: &runner.SQLiteJobStore{DB: db}, Sources: catalog, Metadata: meta, Runner: r, Options: opts, Publisher: &store.Local{Dir: filepath.Join(opts.DataDir, "store")}, wake: make(chan struct{}, 1)}
 }
 
 func failure(status int, detail string) Response {

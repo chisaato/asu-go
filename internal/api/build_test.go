@@ -25,6 +25,7 @@ import (
 	"github.com/gzzchh/asu-go/internal/runner"
 	"github.com/gzzchh/asu-go/internal/runtime"
 	"github.com/gzzchh/asu-go/internal/sources"
+	"github.com/gzzchh/asu-go/internal/store"
 	"github.com/gzzchh/asu-go/internal/stream"
 )
 
@@ -114,6 +115,7 @@ func newBuildHarness(t *testing.T) *buildHarness {
 	q := queue.NewSQLite(database.DB, catalog, buildMetadata{}, &runner.Runner{Runtime: rt, Hub: hub}, queue.Options{DataDir: dir, MaxConcurrentBuilds: 1, MaxPendingJobs: 2, BuildTTL: 7 * 24 * time.Hour, BuildUnversionedTTL: 24 * time.Hour, BuildDefaultsTTL: 30 * time.Minute, BuildFailureTTL: time.Hour, Retention: 7 * 24 * time.Hour})
 	router := gin.New()
 	RegisterBuild(router, q)
+	RegisterStore(router, q.Publisher.(*store.Local))
 	admin.RegisterLogs(router.Group("/admin/api"), stream.Service{Hub: hub, Jobs: q})
 	h := &buildHarness{t: t, q: q, db: database, rt: rt, dir: dir, router: router}
 	t.Cleanup(func() {
@@ -194,6 +196,11 @@ func TestBuildSubmitPoll(t *testing.T) {
 		t.Fatal(result)
 	}
 	image := result["images"].([]any)[0].(map[string]any)
+	download := httptest.NewRecorder()
+	h.router.ServeHTTP(download, httptest.NewRequest("GET", "/store/"+result["bin_dir"].(string)+"/"+image["name"].(string), nil))
+	if download.Code != 200 || download.Body.String() != "firmware" {
+		t.Fatal(download)
+	}
 	sum := sha256.Sum256([]byte("firmware"))
 	if image["sha256"] != hex.EncodeToString(sum[:]) {
 		t.Fatal(image)

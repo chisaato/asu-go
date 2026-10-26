@@ -17,50 +17,11 @@ import (
 
 	"github.com/gzzchh/asu-go/internal/buildreq"
 	"github.com/gzzchh/asu-go/internal/runner"
-	"github.com/gzzchh/asu-go/internal/stream"
 )
 
-// ArtifactPublisher 是 store-ttl 接续正式存储实现的窄接口。
+// ArtifactPublisher 是 store.Store 的发布子接口，便于注入失败测试。
 type ArtifactPublisher interface {
 	Publish(context.Context, string, string) error
-}
-type DirectoryPublisher struct{ Root string }
-
-func (p DirectoryPublisher) Publish(ctx context.Context, id, dir string) error {
-	if err := ctx.Err(); err != nil {
-		return err
-	}
-	if err := stream.ValidateID(id); err != nil {
-		return err
-	}
-	if err := os.MkdirAll(p.Root, 0755); err != nil {
-		return err
-	}
-	dst := filepath.Join(p.Root, id)
-	// 过期后同哈希重建：先移走旧目录，发布失败则恢复旧产物。
-	backup, err := os.MkdirTemp(p.Root, ".replace-")
-	if err != nil {
-		return err
-	}
-	removeBackup := true
-	defer func() {
-		if removeBackup {
-			_ = os.RemoveAll(backup)
-		}
-	}()
-	old := filepath.Join(backup, "old")
-	err = os.Rename(dst, old)
-	if err != nil && !errors.Is(err, os.ErrNotExist) {
-		return err
-	}
-	if err = os.Rename(dir, dst); err != nil {
-		if restoreErr := os.Rename(old, dst); restoreErr != nil && !errors.Is(restoreErr, os.ErrNotExist) {
-			removeBackup = false
-			return errors.Join(err, fmt.Errorf("恢复旧产物（保留于 %s）: %w", old, restoreErr))
-		}
-		return err
-	}
-	return nil
 }
 
 func readResult(dir, profile, id string) (map[string]any, error) {

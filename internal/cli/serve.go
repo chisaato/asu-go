@@ -23,6 +23,7 @@ import (
 	"github.com/gzzchh/asu-go/internal/runner"
 	"github.com/gzzchh/asu-go/internal/runtime"
 	"github.com/gzzchh/asu-go/internal/sources"
+	"github.com/gzzchh/asu-go/internal/store"
 	"github.com/gzzchh/asu-go/internal/stream"
 	"github.com/gzzchh/asu-go/internal/webui"
 	"go.uber.org/zap"
@@ -94,6 +95,9 @@ func runServe(parent context.Context, cfg config.Config) error {
 		Limits: buildreq.Limits{AllowDefaults: cfg.Build.AllowDefaults, MaxDefaultsLength: cfg.Build.MaxDefaultsLength, MaxCustomRootfsSizeMB: cfg.Build.MaxCustomRootfsSizeMB, RepositoryAllowList: cfg.Build.RepositoryAllowList},
 	})
 	admin.RegisterLogs(adminGroup, stream.Service{Hub: hub, Jobs: jobs})
+	artifactStore := &store.Local{Dir: cfg.StoreDir()}
+	jobs.Publisher = artifactStore
+	api.RegisterStore(router, artifactStore)
 	api.RegisterBuild(router, jobs)
 	router.GET("/healthz", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"status": "ok"})
