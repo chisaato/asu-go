@@ -66,7 +66,8 @@ func runServe(parent context.Context, cfg config.Config) error {
 	}
 	admin.RegisterSources(adminGroup, catalog)
 	upstream := metadata.NewClient("asu-go/" + Version)
-	api.RegisterMetadata(router, &metadata.Service{Store: catalog, Client: upstream, Version: Version})
+	metadataCache := &metadata.Cache{Dir: cfg.DataDir, TTL: cfg.Metadata.CacheTTL, Client: upstream, Logger: logger.With(zap.String("component", "metadata-cache"))}
+	api.RegisterMetadata(router, &metadata.Service{Store: catalog, Client: upstream, Version: Version, Cache: metadataCache})
 	router.GET("/healthz", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"status": "ok"})
 	})

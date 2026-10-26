@@ -3,6 +3,7 @@ package metadata
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"sort"
 	"strings"
@@ -62,6 +63,7 @@ type Service struct {
 	Store   *sources.Store
 	Client  *Client
 	Version string
+	Cache   *Cache
 }
 
 func branchInfo(name string) *BranchInfo {
@@ -168,7 +170,19 @@ func (s *Service) Revision(ctx context.Context, version, target, subtarget strin
 	if selected == nil {
 		return "", &RevisionError{400, "Unsupported version: " + version}
 	}
-	res, err := s.Client.Get(ctx, strings.TrimRight(selected.UpstreamURL, "/")+"/"+VersionPath(version)+"/targets/"+target+"/"+subtarget+"/profiles.json")
+	path := VersionPath(version) + "/targets/" + target + "/" + subtarget + "/profiles.json"
+	var res Response
+	if s.Cache != nil {
+		res.Body, err = s.Cache.get(ctx, selected.UpstreamURL, path)
+		res.Status = 200
+		var status *RevisionError
+		if errors.As(err, &status) {
+			res.Status, err = status.Status, nil
+		}
+	} else {
+		// 保留仅使用同步客户端的嵌入调用方；serve 总是配置磁盘缓存。
+		res, err = s.Client.Get(ctx, strings.TrimRight(selected.UpstreamURL, "/")+"/"+path)
+	}
 	if err != nil {
 		return "", err
 	}

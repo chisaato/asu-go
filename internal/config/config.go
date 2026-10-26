@@ -77,6 +77,7 @@ type Runtime struct {
 
 type Metadata struct {
 	RefreshInterval time.Duration `yaml:"refresh_interval"`
+	CacheTTL        time.Duration `yaml:"cache_ttl"`
 }
 
 type Diagnostics struct {
@@ -95,7 +96,7 @@ func Default() Config {
 		Store:       Store{Driver: "local"},
 		Stats:       Stats{Driver: "sqlite"},
 		Runtime:     Runtime{Driver: "docker", Socket: "unix:///var/run/docker.sock", PullPolicy: "missing"},
-		Metadata:    Metadata{RefreshInterval: time.Hour},
+		Metadata:    Metadata{RefreshInterval: time.Hour, CacheTTL: time.Hour},
 		Diagnostics: Diagnostics{Retention: 7 * 24 * time.Hour, KeepContainerTTL: time.Hour, MaxKept: 3},
 	}
 }
@@ -216,6 +217,7 @@ func (c Config) Validate() error {
 		"admin.session_ttl":              c.Admin.SessionTTL,
 		"queue.job_timeout":              c.Queue.JobTimeout,
 		"metadata.refresh_interval":      c.Metadata.RefreshInterval,
+		"metadata.cache_ttl":             c.Metadata.CacheTTL,
 		"diagnostics.retention":          c.Diagnostics.Retention,
 		"diagnostics.keep_container_ttl": c.Diagnostics.KeepContainerTTL,
 	} {

@@ -147,7 +147,7 @@ K8S 预留要点（现在就遵守，避免日后返工）：
 
 ### 4.3 元数据同步
 
-`.versions.json` / `.targets.json` 按 `metadata.refresh_interval`（默认 1h）后台刷新；`profiles.json` 与包索引惰性拉取，磁盘缓存 `data/metadata/`，ETag / `If-Modified-Since` 条件请求；上游失败返回过期缓存并告警；启动不强制同步成功。
+`.versions.json` / `.targets.json` 按 `metadata.refresh_interval`（默认 1h）后台刷新；`profiles.json` 与包索引惰性拉取，按 `metadata.cache_ttl`（默认 1h）复用磁盘缓存 `data/metadata/`，过期执行 ETag / `If-Modified-Since` 条件请求；每份缓存配 `.meta.json` 边车；上游失败返回过期缓存并告警；启动不强制同步成功。
 
 ### 4.5 数据模型与诊断
 

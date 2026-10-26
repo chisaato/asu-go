@@ -34,6 +34,7 @@ runtime:
   pull_policy: missing
 metadata:
   refresh_interval: 1h
+  cache_ttl: 1h
 diagnostics:
   # 168h 即 7 天，时长使用 Go time.Duration 格式。
   retention: 168h
