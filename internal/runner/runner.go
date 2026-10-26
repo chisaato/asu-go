@@ -29,6 +29,7 @@ type Job struct {
 	RepositoryKeys                  []string
 	RootFSSizeMB                    int
 	Filesystem                      string
+	DiffPackages                    bool
 	Verbose, KeepContainer, Setup   bool
 	PullPolicy                      string
 	Rolling                         bool
@@ -62,8 +63,10 @@ type Runner struct {
 	Hub            *stream.Hub
 	JobTimeout     time.Duration
 	RollingRecheck time.Duration
-	pullMu         sync.Mutex
-	checked        map[string]time.Time
+	// BuildScript 仅供受信任的组装层注入；nil 保持生产构建脚本。
+	BuildScript func(Job) (string, error)
+	pullMu      sync.Mutex
+	checked     map[string]time.Time
 }
 
 func (r *Runner) Run(parent context.Context, j Job) (result Result, err error) {
@@ -164,7 +167,11 @@ func (r *Runner) execute(parent context.Context, j Job, existing runtime.Handle)
 		}
 	}()
 	if existing == "" {
-		script, scriptErr := Script(j)
+		buildScript := r.BuildScript
+		if buildScript == nil {
+			buildScript = Script
+		}
+		script, scriptErr := buildScript(j)
 		if scriptErr != nil {
 			return result, scriptErr
 		}

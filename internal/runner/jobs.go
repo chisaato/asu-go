@@ -132,6 +132,11 @@ func (r *Runner) Takeover(ctx context.Context, store JobStore, artifactRoot stri
 		}
 		g.Go(func() error {
 			j := Job{ID: task.ID, ArtifactDir: filepath.Join(artifactRoot, task.ID), KeepContainer: task.KeepContainer}
+			if recorder, ok := store.(interface {
+				RecordStage(context.Context, string, Stage) error
+			}); ok {
+				j.OnStage = func(ctx context.Context, stage Stage) error { return recorder.RecordStage(ctx, task.ID, stage) }
+			}
 			result, runErr := r.Resume(groupCtx, j, task.Handle)
 			// 查询失败不等价于环境不存在，不把暂时不可用的运行时标记为构建失败。
 			if runErr != nil {

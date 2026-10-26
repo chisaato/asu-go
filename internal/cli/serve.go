@@ -8,17 +8,18 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
-	"path/filepath"
 	"syscall"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/gzzchh/asu-go/internal/admin"
 	"github.com/gzzchh/asu-go/internal/api"
+	"github.com/gzzchh/asu-go/internal/buildreq"
 	"github.com/gzzchh/asu-go/internal/config"
 	"github.com/gzzchh/asu-go/internal/db"
 	"github.com/gzzchh/asu-go/internal/logging"
 	"github.com/gzzchh/asu-go/internal/metadata"
+	"github.com/gzzchh/asu-go/internal/queue"
 	"github.com/gzzchh/asu-go/internal/runner"
 	"github.com/gzzchh/asu-go/internal/runtime"
 	"github.com/gzzchh/asu-go/internal/sources"
@@ -71,14 +72,13 @@ func runServe(parent context.Context, cfg config.Config) error {
 	admin.RegisterSources(adminGroup, catalog)
 	upstream := metadata.NewClient("asu-go/" + Version)
 	metadataCache := &metadata.Cache{Dir: cfg.DataDir, TTL: cfg.Metadata.CacheTTL, Client: upstream, Logger: logger.With(zap.String("component", "metadata-cache"))}
-	api.RegisterMetadata(router, &metadata.Service{Store: catalog, Client: upstream, Version: Version, Cache: metadataCache})
+	meta := &metadata.Service{Store: catalog, Client: upstream, Version: Version, Cache: metadataCache}
+	api.RegisterMetadata(router, meta)
 	hub, err := stream.NewHub(cfg.DataDir, stream.DefaultCapacity)
 	if err != nil {
 		return fmt.Errorf("日志 Hub: %w", err)
 	}
 	defer func() { _ = hub.Close() }()
-	jobs := &runner.SQLiteJobStore{DB: database.DB}
-	admin.RegisterLogs(adminGroup, stream.Service{Hub: hub, Jobs: jobs})
 	rt, err := runtime.Open(cfg.Runtime.Driver, runtime.Options{Socket: cfg.Runtime.Socket, MemoryLimit: cfg.Runtime.MemoryLimit, CPUs: cfg.Runtime.CPUs, PullPolicy: cfg.Runtime.PullPolicy})
 	if err != nil {
 		return err
@@ -88,6 +88,13 @@ func runServe(parent context.Context, cfg config.Config) error {
 		return err
 	}
 	buildRunner := &runner.Runner{Runtime: rt, Hub: hub, JobTimeout: cfg.Queue.JobTimeout, RollingRecheck: cfg.Runtime.RollingRecheck}
+	jobs := queue.NewSQLite(database.DB, catalog, meta, buildRunner, queue.Options{
+		DataDir: cfg.DataDir, MaxConcurrentBuilds: cfg.Queue.MaxConcurrentBuilds, MaxPendingJobs: cfg.Queue.MaxPendingJobs,
+		BuildTTL: cfg.Queue.BuildTTL, BuildUnversionedTTL: cfg.Queue.BuildUnversionedTTL, BuildDefaultsTTL: cfg.Queue.BuildDefaultsTTL, BuildFailureTTL: cfg.Queue.BuildFailureTTL, Retention: cfg.Diagnostics.Retention,
+		Limits: buildreq.Limits{AllowDefaults: cfg.Build.AllowDefaults, MaxDefaultsLength: cfg.Build.MaxDefaultsLength, MaxCustomRootfsSizeMB: cfg.Build.MaxCustomRootfsSizeMB, RepositoryAllowList: cfg.Build.RepositoryAllowList},
+	})
+	admin.RegisterLogs(adminGroup, stream.Service{Hub: hub, Jobs: jobs})
+	api.RegisterBuild(router, jobs)
 	router.GET("/healthz", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"status": "ok"})
 	})
@@ -102,7 +109,7 @@ func runServe(parent context.Context, cfg config.Config) error {
 		BaseContext:       func(net.Listener) context.Context { return ctx },
 	}
 	group, groupCtx := errgroup.WithContext(ctx)
-	group.Go(func() error { return buildRunner.Takeover(groupCtx, jobs, filepath.Join(cfg.DataDir, "recovery")) })
+	group.Go(func() error { return jobs.Run(groupCtx) })
 	scavenger := &runner.Scavenger{Runtime: rt, Jobs: jobs, Interval: cfg.Runtime.ScavengerInterval, KeepContainerTTL: cfg.Diagnostics.KeepContainerTTL, MaxKept: cfg.Diagnostics.MaxKept}
 	group.Go(func() error { return scavenger.Run(groupCtx) })
 	syncer := &metadata.Syncer{Store: catalog, Client: upstream, Logger: logger.With(zap.String("component", "metadata"))}
