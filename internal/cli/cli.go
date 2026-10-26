@@ -13,7 +13,9 @@ var Version = "dev"
 
 func NewCommand() *cobra.Command {
 	root := &cobra.Command{Use: "asu", Short: "ASU-Go 固件升级服务", SilenceUsage: true}
-	var path, listen, level, dataDir string
+	var path, listen, level, dataDir, server, token string
+	root.PersistentFlags().StringVar(&server, "server", "http://127.0.0.1:8000", "管理 API 地址")
+	root.PersistentFlags().StringVar(&token, "token", "", "管理 API Bearer token（也读取 ASU_ADMIN_TOKEN 或配置）")
 	root.PersistentFlags().StringVar(&path, "config", "", "配置文件（默认查找 ./asu.yaml、/etc/asu/asu.yaml）")
 	root.PersistentFlags().StringVar(&level, "log-level", "", "日志级别")
 	root.PersistentFlags().StringVar(&listen, "listen", "", "服务监听地址")
@@ -67,7 +69,7 @@ func NewCommand() *cobra.Command {
 			return database.Migrate(cmd.Context())
 		},
 	})
-	root.AddCommand(serve, configCmd, dbCmd, &cobra.Command{Use: "version", Short: "打印版本", Args: cobra.NoArgs,
+	root.AddCommand(newSourceCommand(load, &server, &token), serve, configCmd, dbCmd, &cobra.Command{Use: "version", Short: "打印版本", Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			_, err := fmt.Fprintln(cmd.OutOrStdout(), Version)
 			return err

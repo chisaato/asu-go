@@ -140,6 +140,7 @@ func Load(path string, flags Overrides) (Config, error) {
 		"ASU_SERVER_LISTEN": &cfg.Server.Listen,
 		"ASU_LOG_LEVEL":     &cfg.Log.Level,
 		"ASU_DATA_DIR":      &cfg.DataDir,
+		"ASU_ADMIN_TOKEN":   &cfg.Admin.APIToken,
 	} {
 		if value, ok := os.LookupEnv(key); ok {
 			*dst = value
