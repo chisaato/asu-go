@@ -97,18 +97,29 @@ asu version
 type Runtime interface {
     // Prepare 确保构建镜像可用（拉取 / 校验）。
     Prepare(ctx context.Context, spec ImageSpec) error
-    // Start 启动一次构建，返回句柄。
-    Start(ctx context.Context, spec RunSpec) (Handle, error)
+    // Create 分配环境，返回可持久化的不透明句柄。
+    Create(ctx context.Context, spec RunSpec) (Handle, error)
+    // PutArchive 在启动前注入 tar 文件流，无宿主路径依赖。
+    PutArchive(ctx context.Context, h Handle, path string, archive io.Reader) error
+    // Start 启动主进程。
+    Start(ctx context.Context, h Handle) error
     // Logs 流式读取已解复用的标准输出与错误流（follow 长连接，非轮询、非 Hijack），直至结束或 ctx 取消。
-    Logs(ctx context.Context, h Handle) (io.ReadCloser, error)
+    Logs(ctx context.Context, h Handle, opts LogsOptions) (io.ReadCloser, error)
     // Wait 阻塞到结束并返回退出信息。
     Wait(ctx context.Context, h Handle) (ExitStatus, error)
-    // Kill 强制终止并清理底层资源（幂等）。
+    // GetArchive 即使主进程已经退出也能取回目录 tar 流。
+    GetArchive(ctx context.Context, h Handle, path string) (io.ReadCloser, error)
+    // Kill 强制终止但保留日志与产物（幂等）。
     Kill(ctx context.Context, h Handle) error
+    // Remove 最终清理底层资源（幂等）。
+    Remove(ctx context.Context, h Handle) error
     // Info 返回引擎名称、版本等，用于管理后台展示。
     Info(ctx context.Context) (Info, error)
+    Close() error
 }
 ```
+
+`LogsOptions` 包含 `Follow`、`Since`（时间戳字符串）、`Timestamps`。`runtime.Open(driver, Options)` 通过注册表创建驱动；组装层将 `config.Runtime` 的 socket、memory_limit、cpus、pull_policy 映射至 `Options`。`Prepare` / `Info` 执行引擎版本及日志可读性检查；Podman 兼容 `/info` 缺失默认日志驱动时，仅此处查询原生只读 `/libpod/info`。
 
 驱动：
 
