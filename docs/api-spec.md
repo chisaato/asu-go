@@ -80,6 +80,7 @@
 - **核心计算逻辑 (Request Hash)**：
   - 基于请求的核心参数（`distro`, `version`, `version_code`, `target`, `profile`, `packages`（去 `+` 前缀、去重、排序）, `packages_versions`, `diff_packages`, `filesystem`, `defaults`, `rootfs_size_mb`, `repositories`, `repository_keys`, `repositories_mode`）转为**规范 JSON**（键排序、无多余空白、null 与空值显式区分）后计算 SHA-256，输出 64 位小写十六进制作为 `request_hash`。
   - **不复刻原版 Python 的哈希拼接**（依赖 `str(list)`/`str(dict)` 的 repr）：客户端只把 `request_hash` 当不透明标识使用，且不与原版共享缓存。
+  - **历史包名修正在哈希之后执行**：`internal/pkgchanges` 全量迁移原版规则，在 queue 组装实际构建 Job 时按版本、target、已解析 profile 应用，再由 Runner 计算 `diff_packages`；不改 `jobs.request` 或请求哈希，与原版先哈希、后修正、再差异包的顺序一致。没有 distro 限制；23.05/24.10/25.12 使用原版版本前缀条件，SNAPSHOT 移除仅匹配精确值，语言包阈值保留原版字符串比较。非空 `packages_versions` 的键优先选包，但修正不改其版本约束（旧包版本约束可能无法通过 manifest 校验）。最终响应的 `build_cmd_packages` 是修正后的实际命令包列表。
   - 同哈希重复提交不入队，直接返回已有任务状态；排队数超过 `max_pending_jobs`（默认 200）返回 **529**；用户 Kill 的任务对外表现为 `failed`（`detail: cancelled`）。
   - 响应码与头沿用原版：排队/运行中 202，成功 200，失败 500；`X-Imagebuilder-Status`、`X-Queue-Position`。
 
