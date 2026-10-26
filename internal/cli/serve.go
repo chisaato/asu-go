@@ -12,9 +12,11 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/gzzchh/asu-go/internal/admin"
 	"github.com/gzzchh/asu-go/internal/config"
 	"github.com/gzzchh/asu-go/internal/db"
 	"github.com/gzzchh/asu-go/internal/logging"
+	"github.com/gzzchh/asu-go/internal/sources"
 	"github.com/gzzchh/asu-go/internal/webui"
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
@@ -40,6 +42,10 @@ func runServe(parent context.Context, cfg config.Config) error {
 	if err := database.Migrate(ctx); err != nil {
 		return err
 	}
+	catalog := sources.NewStore(database)
+	if err := catalog.SeedDefaults(ctx); err != nil {
+		return err
+	}
 	gin.SetMode(gin.ReleaseMode)
 	router := gin.New()
 	webui.Register(router)
@@ -52,6 +58,7 @@ func runServe(parent context.Context, cfg config.Config) error {
 		}()
 		c.Next()
 	})
+	admin.RegisterSources(router.Group("/admin/api", admin.RequireAuth(admin.BearerAuthenticator(cfg.Admin.APIToken))), catalog)
 	router.GET("/healthz", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"status": "ok"})
 	})
