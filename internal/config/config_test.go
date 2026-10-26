@@ -113,6 +113,7 @@ func TestValidationPaths(t *testing.T) {
 		{"runtime.socket", func(c *Config) { c.Runtime.Socket = "" }},
 		{"queue.job_timeout", func(c *Config) { c.Queue.JobTimeout = 0 }},
 		{"admin.session_ttl", func(c *Config) { c.Admin.SessionTTL = 0 }},
+		{"metadata.cache_ttl", func(c *Config) { c.Metadata.CacheTTL = 0 }},
 		{"admin.users[0].name", func(c *Config) { c.Admin.Users = []AdminUser{{}} }},
 		{"admin.users[0].password_hash", func(c *Config) { c.Admin.Users = []AdminUser{{Name: "admin", PasswordHash: "plain"}} }},
 	} {
