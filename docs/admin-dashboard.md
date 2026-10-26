@@ -97,4 +97,14 @@
 2. **嵌入式编译**：
    前端经 `nuxt generate` 编译后产物输出至 `web/dist`，Go 通过 `//go:embed all:dist` 嵌入可执行文件。
 3. **免额外代理**：
-   Go API 服务同时作为静态文件文件服务器，内置 HTTP 路由直接接管 `/admin` 路径，无需用户再额外部署 Nginx 或 Caddy 处理前端路由。
+    Go API 服务同时作为静态文件文件服务器，内置 HTTP 路由直接接管 `/admin` 路径，无需用户再额外部署 Nginx 或 Caddy 处理前端路由。
+
+## 5. 管理认证
+
+- `admin.users` 配置账号（`name`、bcrypt `password_hash`）；`printf '%s\n' '密码' | asu admin hash-password` 生成哈希。密码最长 72 字节，不通过命令行参数传密码；终端直接输入会回显，建议通过安全的 stdin 管道输入。
+- `POST /admin/api/login` 接收 JSON `{"name":"admin","password":"..."}`；成功返回 `{"name":"admin"}` 并设置签名 cookie（HttpOnly、SameSite=Lax、Path=/admin；直接 HTTPS 时带 Secure）。生产环境必须使用 HTTPS；反向代理必须保证外部 HTTPS，后端不信任客户端转发头。
+- `GET /admin/api/me` 返回当前用户名；Bearer 认证返回 `{"name":"api_token"}`。`POST /admin/api/logout` 清除浏览器 cookie，返回 204。无状态签名会话不提供服务端撤销；已复制的 cookie 在过期前仍有效。轮换密钥可统一失效所有会话。
+- `admin.session_ttl` 默认 24h；`admin.session_secret` 应设为高熵随机长字符串。为空时每次启动生成随机密钥并警告，重启后会话失效。
+- 所有管理 API（登录除外）接受 cookie **或** Bearer `admin.api_token`；空 token 仅禁用 Bearer 路径。两种凭据均无效时返回 401，不再返回 503。公开 `/api/v1`、`/json/v1`、`/store` 不受管理认证影响。
+- **CSRF**：cookie 认证的非 GET/HEAD/OPTIONS 请求必须带 `X-Requested-With: asu-admin`，否则 403；Bearer 请求不要求此头。管理接口不得开放跨域 CORS。登录接口无需该头。
+- 登录失败信息统一；直连 IP + 用户名每 5 分钟最多 5 次尝试（并发请求也计数，成功清除计数），超限返回 429 与 `Retry-After: 300`。内存表最多 10000 项，窗口惰性清理；不信任 `X-Forwarded-For`，代理部署时同一用户名的请求共享代理 IP 限额。

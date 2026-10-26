@@ -58,7 +58,11 @@ func runServe(parent context.Context, cfg config.Config) error {
 		}()
 		c.Next()
 	})
-	admin.RegisterSources(router.Group("/admin/api", admin.RequireAuth(admin.BearerAuthenticator(cfg.Admin.APIToken))), catalog)
+	adminGroup, err := admin.RegisterAuth(router, cfg.Admin, logger)
+	if err != nil {
+		return err
+	}
+	admin.RegisterSources(adminGroup, catalog)
 	router.GET("/healthz", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"status": "ok"})
 	})

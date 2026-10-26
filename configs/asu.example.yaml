@@ -7,8 +7,16 @@ log:
   level: info
 data_dir: data
 admin:
-  # 管理 API Bearer token；为空则禁用管理 API（503）。生产环境通过 ASU_ADMIN_TOKEN 注入。
+  # 为空仅禁用 Bearer 路径；没有有效 cookie 或 token 时返回 401。
   api_token: ""
+  # 使用 asu admin hash-password 从 stdin 生成 bcrypt 哈希。
+  # users:
+  #   - name: admin
+  #     password_hash: '$2a$...'
+  users: null
+  # 为空则启动生成随机密钥并警告，重启后已有会话失效。生产环境应配置随机长密钥。
+  session_secret: ""
+  session_ttl: 24h
 queue:
   driver: sqlite
   max_concurrent_builds: 2

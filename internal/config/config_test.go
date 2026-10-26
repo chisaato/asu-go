@@ -18,8 +18,12 @@ func TestYAMLTags(t *testing.T) {
 			if !valid.MatchString(field.Tag.Get("yaml")) {
 				t.Errorf("%s.%s 缺少合法 YAML 标签", typ.Name(), field.Name)
 			}
-			if field.Type.Kind() == reflect.Struct {
-				check(field.Type)
+			nested := field.Type
+			if nested.Kind() == reflect.Slice {
+				nested = nested.Elem()
+			}
+			if nested.Kind() == reflect.Struct {
+				check(nested)
 			}
 		}
 	}
@@ -108,6 +112,9 @@ func TestValidationPaths(t *testing.T) {
 		{"runtime.driver", func(c *Config) { c.Runtime.Driver = "kubernetes" }},
 		{"runtime.socket", func(c *Config) { c.Runtime.Socket = "" }},
 		{"queue.job_timeout", func(c *Config) { c.Queue.JobTimeout = 0 }},
+		{"admin.session_ttl", func(c *Config) { c.Admin.SessionTTL = 0 }},
+		{"admin.users[0].name", func(c *Config) { c.Admin.Users = []AdminUser{{}} }},
+		{"admin.users[0].password_hash", func(c *Config) { c.Admin.Users = []AdminUser{{Name: "admin", PasswordHash: "plain"}} }},
 	} {
 		t.Run(tc.path, func(t *testing.T) {
 			cfg := Default()
