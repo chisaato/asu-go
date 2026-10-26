@@ -9,6 +9,10 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/gzzchh/asu-go/internal/queue"
+	"github.com/gzzchh/asu-go/internal/runtime"
+	"github.com/gzzchh/asu-go/internal/stats"
+	"github.com/gzzchh/asu-go/internal/store"
 	"go.uber.org/zap/zapcore"
 	"gopkg.in/yaml.v3"
 )
@@ -20,6 +24,7 @@ type Config struct {
 	Admin       Admin       `yaml:"admin"`
 	Queue       Queue       `yaml:"queue"`
 	Store       Store       `yaml:"store"`
+	Stats       Stats       `yaml:"stats"`
 	Runtime     Runtime     `yaml:"runtime"`
 	Metadata    Metadata    `yaml:"metadata"`
 	Diagnostics Diagnostics `yaml:"diagnostics"`
@@ -48,6 +53,10 @@ type Store struct {
 	Driver string `yaml:"driver"`
 }
 
+type Stats struct {
+	Driver string `yaml:"driver"`
+}
+
 type Runtime struct {
 	Driver      string  `yaml:"driver"`
 	Socket      string  `yaml:"socket"`
@@ -73,6 +82,7 @@ func Default() Config {
 		DataDir:     "data",
 		Queue:       Queue{Driver: "sqlite", MaxConcurrentBuilds: 2, JobTimeout: 10 * time.Minute},
 		Store:       Store{Driver: "local"},
+		Stats:       Stats{Driver: "sqlite"},
 		Runtime:     Runtime{Driver: "docker", Socket: "unix:///var/run/docker.sock", PullPolicy: "missing"},
 		Metadata:    Metadata{RefreshInterval: time.Hour},
 		Diagnostics: Diagnostics{Retention: 7 * 24 * time.Hour, KeepContainerTTL: time.Hour, MaxKept: 3},
@@ -162,14 +172,17 @@ func (c Config) Validate() error {
 	if c.DataDir == "" {
 		return errors.New("data_dir: 不得为空")
 	}
-	if c.Queue.Driver != "sqlite" {
-		return errors.New("queue.driver: 仅支持 sqlite")
+	if _, err := queue.Lookup(c.Queue.Driver); err != nil {
+		return fmt.Errorf("queue.driver: %w", err)
 	}
-	if c.Store.Driver != "local" {
-		return errors.New("store.driver: 仅支持 local")
+	if _, err := store.Lookup(c.Store.Driver); err != nil {
+		return fmt.Errorf("store.driver: %w", err)
 	}
-	if c.Runtime.Driver != "docker" && c.Runtime.Driver != "podman" {
-		return errors.New("runtime.driver: 仅支持 docker 或 podman")
+	if _, err := stats.Lookup(c.Stats.Driver); err != nil {
+		return fmt.Errorf("stats.driver: %w", err)
+	}
+	if _, err := runtime.Lookup(c.Runtime.Driver); err != nil {
+		return fmt.Errorf("runtime.driver: %w", err)
 	}
 	if c.Runtime.Socket == "" {
 		return errors.New("runtime.socket: 不得为空")
