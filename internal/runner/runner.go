@@ -1,4 +1,4 @@
-// Package runner 编排一次隔离构建，不依赖 HTTP 或任务数据库。
+// Package runner 编排隔离构建与重启恢复，不依赖 HTTP 或具体容器引擎。
 package runner
 
 import (
@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/gzzchh/asu-go/internal/runtime"
@@ -30,6 +31,7 @@ type Job struct {
 	Filesystem                      string
 	Verbose, KeepContainer, Setup   bool
 	PullPolicy                      string
+	Rolling                         bool
 	Env                             []string
 	// ArtifactDir 由调用方提供，建议为空的任务专属临时目录。
 	ArtifactDir string
@@ -56,25 +58,66 @@ func (e *Error) Error() string {
 func (e *Error) Unwrap() error { return e.Cause }
 
 type Runner struct {
-	Runtime    runtime.Runtime
-	Hub        *stream.Hub
-	JobTimeout time.Duration
+	Runtime        runtime.Runtime
+	Hub            *stream.Hub
+	JobTimeout     time.Duration
+	RollingRecheck time.Duration
+	pullMu         sync.Mutex
+	checked        map[string]time.Time
 }
 
 func (r *Runner) Run(parent context.Context, j Job) (result Result, err error) {
+	return r.execute(parent, j, "")
+}
+
+// Resume 不重新创建、注入或启动环境；容器日志从头覆写，随后共享 Run 的收尾。
+func (r *Runner) Resume(parent context.Context, j Job, h runtime.Handle) (Result, error) {
+	if h == "" {
+		return Result{ExitCode: -1}, &Error{Kind: "interrupted", ExitCode: -1, Cause: errors.New("interrupted")}
+	}
+	s, err := r.Runtime.Inspect(parent, h)
+	if err != nil {
+		return Result{}, err
+	}
+	if !s.Exists {
+		return Result{Handle: h, ExitCode: -1}, &Error{Kind: "interrupted", ExitCode: -1, Cause: errors.New("interrupted")}
+	}
+	return r.execute(parent, j, h)
+}
+
+func (r *Runner) prepare(ctx context.Context, j Job) error {
+	if !j.Rolling {
+		return r.Runtime.Prepare(ctx, runtime.ImageSpec{Reference: j.Image, PullPolicy: j.PullPolicy})
+	}
+	r.pullMu.Lock()
+	defer r.pullMu.Unlock()
+	interval := r.RollingRecheck
+	if interval <= 0 {
+		interval = 6 * time.Hour
+	}
+	policy := j.PullPolicy
+	last := r.checked[j.Image]
+	if last.IsZero() || time.Since(last) >= interval {
+		policy = "always"
+	}
+	if err := r.Runtime.Prepare(ctx, runtime.ImageSpec{Reference: j.Image, PullPolicy: policy}); err != nil {
+		return err
+	}
+	if r.checked == nil {
+		r.checked = make(map[string]time.Time)
+	}
+	if policy == "always" {
+		r.checked[j.Image] = time.Now()
+	}
+	return nil
+}
+
+func (r *Runner) execute(parent context.Context, j Job, existing runtime.Handle) (result Result, err error) {
 	if err = stream.ValidateID(j.ID); err != nil {
 		return result, err
 	}
 	if j.ArtifactDir == "" {
 		return result, fmt.Errorf("必须指定 ArtifactDir")
-	}
-	script, err := Script(j)
-	if err != nil {
-		return result, err
-	}
-	archive, err := inputs(j)
-	if err != nil {
-		return result, err
 	}
 	if err = r.Hub.Begin(j.ID); err != nil {
 		return result, err
@@ -86,6 +129,7 @@ func (r *Runner) Run(parent context.Context, j Job) (result Result, err error) {
 	ctx, cancel := context.WithTimeout(parent, timeout)
 	defer cancel()
 	result.ExitCode = -1
+	result.Handle = existing
 	defer func() {
 		cause := ctx.Err()
 		if cause != nil {
@@ -97,7 +141,7 @@ func (r *Runner) Run(parent context.Context, j Job) (result Result, err error) {
 			if err != nil {
 				err = errors.Join(err, r.Runtime.Kill(cleanup, result.Handle))
 			}
-			if err == nil || !j.KeepContainer {
+			if err == nil || !j.KeepContainer || cause != nil {
 				err = errors.Join(err, r.Runtime.Remove(cleanup, result.Handle))
 			}
 		}
@@ -119,25 +163,35 @@ func (r *Runner) Run(parent context.Context, j Job) (result Result, err error) {
 			err = &Error{Kind: kind, ExitCode: result.ExitCode, Tail: tail, Cause: err}
 		}
 	}()
-	if err = r.Runtime.Prepare(ctx, runtime.ImageSpec{Reference: j.Image, PullPolicy: j.PullPolicy}); err != nil {
-		return result, err
-	}
-	result.Handle, err = r.Runtime.Create(ctx, runtime.RunSpec{Image: j.Image, Command: []string{"sh", "-c", script}, WorkingDir: "/builder", RequestHash: j.ID, Env: j.Env, KeepContainer: j.KeepContainer})
-	if err != nil {
-		return result, err
-	}
-	if j.OnHandle != nil {
-		if err = j.OnHandle(ctx, result.Handle); err != nil {
+	if existing == "" {
+		script, scriptErr := Script(j)
+		if scriptErr != nil {
+			return result, scriptErr
+		}
+		archive, archiveErr := inputs(j)
+		if archiveErr != nil {
+			return result, archiveErr
+		}
+		if err = r.prepare(ctx, j); err != nil {
+			return result, err
+		}
+		result.Handle, err = r.Runtime.Create(ctx, runtime.RunSpec{Image: j.Image, Command: []string{"sh", "-c", script}, WorkingDir: "/builder", RequestHash: j.ID, Env: j.Env, KeepContainer: j.KeepContainer})
+		if err != nil {
+			return result, err
+		}
+		if j.OnHandle != nil {
+			if err = j.OnHandle(ctx, result.Handle); err != nil {
+				return result, err
+			}
+		}
+		if err = r.Runtime.PutArchive(ctx, result.Handle, "/builder", bytes.NewReader(archive)); err != nil {
+			return result, err
+		}
+		if err = r.Runtime.Start(ctx, result.Handle); err != nil {
 			return result, err
 		}
 	}
-	if err = r.Runtime.PutArchive(ctx, result.Handle, "/builder", bytes.NewReader(archive)); err != nil {
-		return result, err
-	}
-	if err = r.Runtime.Start(ctx, result.Handle); err != nil {
-		return result, err
-	}
-	logs, err := r.Runtime.Logs(ctx, result.Handle, runtime.LogsOptions{Follow: true})
+	logs, err := r.Runtime.Logs(ctx, result.Handle, runtime.LogsOptions{Follow: true, Timestamps: existing != ""})
 	if err != nil {
 		return result, err
 	}
@@ -146,11 +200,19 @@ func (r *Runner) Run(parent context.Context, j Job) (result Result, err error) {
 	scanner.Buffer(make([]byte, 4096), 4<<20)
 	for scanner.Scan() {
 		line := scanner.Text()
+		at := time.Now().UTC()
+		if existing != "" {
+			if prefix, content, ok := strings.Cut(line, " "); ok {
+				if stamp, parseErr := time.Parse(time.RFC3339Nano, prefix); parseErr == nil {
+					at, line = stamp, content
+				}
+			}
+		}
 		if err = r.Hub.Append(j.ID, line+"\n"); err != nil {
 			return result, err
 		}
 		if name, ok := strings.CutPrefix(line, "##asu:stage="); ok && validStage(name) {
-			stage := Stage{Name: name, At: time.Now().UTC()}
+			stage := Stage{Name: name, At: at}
 			result.Stages = append(result.Stages, stage)
 			if j.OnStage != nil {
 				if err = j.OnStage(ctx, stage); err != nil {

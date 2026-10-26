@@ -111,6 +111,8 @@ func TestValidationPaths(t *testing.T) {
 		{"stats.driver", func(c *Config) { c.Stats.Driver = "redis" }},
 		{"runtime.driver", func(c *Config) { c.Runtime.Driver = "kubernetes" }},
 		{"runtime.socket", func(c *Config) { c.Runtime.Socket = "" }},
+		{"runtime.rolling_recheck", func(c *Config) { c.Runtime.RollingRecheck = 0 }},
+		{"runtime.scavenger_interval", func(c *Config) { c.Runtime.ScavengerInterval = -1 }},
 		{"queue.job_timeout", func(c *Config) { c.Queue.JobTimeout = 0 }},
 		{"admin.session_ttl", func(c *Config) { c.Admin.SessionTTL = 0 }},
 		{"admin.users[0].name", func(c *Config) { c.Admin.Users = []AdminUser{{}} }},

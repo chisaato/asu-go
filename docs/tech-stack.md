@@ -113,6 +113,10 @@ type Runtime interface {
     Kill(ctx context.Context, h Handle) error
     // Remove 最终清理底层资源（幂等）。
     Remove(ctx context.Context, h Handle) error
+    // Inspect 返回存在性、运行状态、标签与创建/退出时间；不存在不是错误。
+    Inspect(ctx context.Context, h Handle) (State, error)
+    // List 只列举 managed-by=asu-go 的环境，包含已退出环境。
+    List(ctx context.Context) ([]State, error)
     // Info 返回引擎名称、版本等，用于管理后台展示。
     Info(ctx context.Context) (Info, error)
     Close() error
@@ -155,7 +159,7 @@ K8S 预留要点（现在就遵守，避免日后返工）：
 
 ### 4.4 构建并发与镜像
 
-`queue.max_concurrent_builds` 默认 2，`job_timeout` 默认 10m，`runtime.memory_limit` / `runtime.cpus` 默认不限，`runtime.pull_policy: missing|always|never` 默认 `missing`，`rolling` source 定期复查。一期不自动清理镜像（磁盘风险：每个 target 一份，GB 级），二期在后台存储页手动清理。
+`queue.max_concurrent_builds` 默认 2，`job_timeout` 默认 10m，`runtime.memory_limit` / `runtime.cpus` 默认不限，`runtime.pull_policy: missing|always|never` 默认 `missing`。`rolling` source 按 `runtime.rolling_recheck`（默认 6h）强制 always 复查，检查时间保存在 Runner 实例内存，重启后首次使用重新检查。`runtime.scavenger_interval` 默认 5m，启动立即执行一次回收；活跃任务不回收，非活跃诊断环境按保留 TTL/数量清理。一期不自动清理镜像（磁盘风险：每个 target 一份，GB 级），二期在后台存储页手动清理。
 
 ---
 

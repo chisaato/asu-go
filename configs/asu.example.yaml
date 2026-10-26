@@ -32,6 +32,9 @@ runtime:
   memory_limit: 0
   cpus: 0
   pull_policy: missing
+  # rolling 镜像到期强制复查；每次进程重启后首次使用也会复查。
+  rolling_recheck: 6h
+  scavenger_interval: 5m
 metadata:
   refresh_interval: 1h
 diagnostics:
