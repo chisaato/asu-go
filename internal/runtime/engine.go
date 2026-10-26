@@ -143,9 +143,13 @@ func (e *engine) Prepare(ctx context.Context, spec ImageSpec) error {
 	return r.Wait(ctx)
 }
 func (e *engine) Create(ctx context.Context, spec RunSpec) (Handle, error) {
+	labels := map[string]string{"managed-by": "asu-go", "asu.request_hash": spec.RequestHash}
+	if spec.KeepContainer {
+		labels["asu.keep_container"] = "true"
+	}
 	r, err := e.client.ContainerCreate(ctx, client.ContainerCreateOptions{
 		NetworkingConfig: &network.NetworkingConfig{EndpointsConfig: map[string]*network.EndpointSettings{buildNetwork: {}}},
-		Config:           &container.Config{Image: spec.Image, Cmd: spec.Command, Env: spec.Env, WorkingDir: spec.WorkingDir, User: spec.User, Labels: map[string]string{"managed-by": "asu-go", "asu.request_hash": spec.RequestHash}},
+		Config:           &container.Config{Image: spec.Image, Cmd: spec.Command, Env: spec.Env, WorkingDir: spec.WorkingDir, User: spec.User, Labels: labels},
 		HostConfig:       &container.HostConfig{CapDrop: []string{"ALL"}, SecurityOpt: []string{"no-new-privileges:true"}, NetworkMode: container.NetworkMode(buildNetwork), Resources: container.Resources{Memory: e.opts.MemoryLimit, NanoCPUs: int64(e.opts.CPUs * 1e9)}},
 	})
 	return Handle(r.ID), err

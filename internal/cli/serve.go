@@ -19,6 +19,7 @@ import (
 	"github.com/gzzchh/asu-go/internal/logging"
 	"github.com/gzzchh/asu-go/internal/metadata"
 	"github.com/gzzchh/asu-go/internal/sources"
+	"github.com/gzzchh/asu-go/internal/stream"
 	"github.com/gzzchh/asu-go/internal/webui"
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
@@ -67,6 +68,13 @@ func runServe(parent context.Context, cfg config.Config) error {
 	admin.RegisterSources(adminGroup, catalog)
 	upstream := metadata.NewClient("asu-go/" + Version)
 	api.RegisterMetadata(router, &metadata.Service{Store: catalog, Client: upstream, Version: Version})
+	hub, err := stream.NewHub(cfg.DataDir, stream.DefaultCapacity)
+	if err != nil {
+		return fmt.Errorf("日志 Hub: %w", err)
+	}
+	defer func() { _ = hub.Close() }()
+	// jobs/队列接入时替换此内存适配；当前已可读取落盘历史日志。
+	admin.RegisterLogs(adminGroup, stream.Service{Hub: hub, Jobs: stream.NewMemoryJobSource()})
 	router.GET("/healthz", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"status": "ok"})
 	})
