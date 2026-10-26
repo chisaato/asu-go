@@ -1,16 +1,18 @@
-// Package runtime 仅预留运行时注册机制；完整 Runtime 生命周期接口由 runtime-runner/01 定义。
+// Package runtime 定义与引擎无关的隔离构建生命周期。
 package runtime
 
 import "github.com/gzzchh/asu-go/internal/driver"
 
-// Driver 是注册描述符，不代表已能执行构建。
-type Driver interface{ Name() string }
+type Driver interface {
+	Name() string
+	Open(Options) (Runtime, error)
+}
 
 var registry driver.Registry[Driver]
 
 func init() {
-	_ = Register(driver.Name("docker"))
-	_ = Register(driver.Name("podman"))
+	_ = Register(engineDriver("docker"))
+	_ = Register(engineDriver("podman"))
 }
 
 func Register(d Driver) error            { return registry.Register(d) }
