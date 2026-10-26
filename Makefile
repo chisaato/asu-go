@@ -1,15 +1,18 @@
-.PHONY: dev build test lint
+.PHONY: dev web build test lint
 
 dev:
 	@if [ -d web ]; then \
+		(cd web && bun install) || exit $$?; \
 		(cd web && bun run dev) & \
 		web_pid=$$!; \
 		trap 'kill "$$web_pid" 2>/dev/null || true' INT TERM EXIT; \
 		go run ./cmd/asu serve; \
 	else go run ./cmd/asu serve; fi
 
-build:
-	@if [ -d web ]; then cd web && bun run generate; fi
+web:
+	@if [ -d web ]; then cd web && bun install && bun run generate; fi
+
+build: web
 	go build -o bin/asu ./cmd/asu
 
 test:
