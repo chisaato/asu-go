@@ -159,6 +159,8 @@ K8S 预留要点（现在就遵守，避免日后返工）：
 
 ### 4.4 构建并发与镜像
 
+`queue.max_pending_jobs` 默认 200（仅计 queued，达到上限拒绝新任务，重复请求仍复用已有状态）。公开缓存期限由 `queue.build_ttl`（带 packages_versions，168h）、`queue.build_unversioned_ttl`（其余，24h）、`queue.build_defaults_ttl`（带 defaults 优先，30m）、`queue.build_failure_ttl`（失败，1h）控制；入队预写、完成后重新起算，管理保留期限使用 `diagnostics.retention`。`build` 段提供 `allow_defaults`、`max_defaults_length`（20480）、`max_custom_rootfs_size_mb`（1024）、`repository_allow_list`，默认不允许 defaults 与自定义仓库。
+
 `queue.max_concurrent_builds` 默认 2，`job_timeout` 默认 10m，`runtime.memory_limit` / `runtime.cpus` 默认不限，`runtime.pull_policy: missing|always|never` 默认 `missing`。`rolling` source 按 `runtime.rolling_recheck`（默认 6h）强制 always 复查，检查时间保存在 Runner 实例内存，重启后首次使用重新检查。`runtime.scavenger_interval` 默认 5m，启动立即执行一次回收；活跃任务不回收，非活跃诊断环境按保留 TTL/数量清理。一期不自动清理镜像（磁盘风险：每个 target 一份，GB 级），二期在后台存储页手动清理。
 
 ---

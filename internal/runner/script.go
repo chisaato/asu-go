@@ -40,7 +40,14 @@ func Script(j Job) (string, error) {
 	if j.VersionCode != "" {
 		fmt.Fprintf(&b, "revision=$(sed -n 's/.*Current Revision: \"\\(.*\\)\".*/\\1/p' .asu-info)\n[ \"$revision\" = %s ] || { echo 'Received incorrect version'; exit 1; }\n", quote(j.VersionCode))
 	}
-	common := " " + quote("PROFILE="+j.Profile) + " " + quote("PACKAGES="+strings.Join(j.Packages, " "))
+	fmt.Fprintf(&b, "requested=%s\npackages=$requested\n", quote(strings.Join(j.Packages, " ")))
+	if j.DiffPackages {
+		// 使用实际 ImageBuilder 的默认包，而非可能已更新的上游 profiles 缓存。
+		b.WriteString("sed -n 's/^Default Packages: //p' .asu-info > .asu-defaults\n")
+		fmt.Fprintf(&b, "awk -v profile=%s '$0 == profile \":\" { found=1; next } found && /^    Packages: / { sub(/^    Packages: /,\"\"); print; exit }' .asu-info >> .asu-defaults\n", quote(j.Profile))
+		b.WriteString("defaults=$(tr ' ' '\\n' < .asu-defaults | LC_ALL=C sort -u)\nremove=''\nfor pkg in $defaults; do\n  case \" $requested \" in *\" $pkg \"*) ;; *) remove=\"$remove -${pkg#-}\" ;; esac\ndone\npackages=\"${remove# }${remove:+ }$requested\"\n")
+	}
+	common := " " + quote("PROFILE="+j.Profile) + " \"PACKAGES=$packages\""
 	b.WriteString("printf '%s\\n' '##asu:stage=validate_manifest'\n")
 	b.WriteString("capture .asu-manifest make manifest" + common + " STRIP_ABI=1\n")
 	keys := make([]string, 0, len(j.PackageVersions))
@@ -69,5 +76,7 @@ func Script(j Job) (string, error) {
 		b.WriteString(" V=s")
 	}
 	b.WriteByte('\n')
+	b.WriteString("cp .asu-manifest " + quote(bin+"/manifest") + "\n")
+	b.WriteString("printf '%s\\n' \"$packages\" > " + quote(bin+"/build_cmd_packages") + "\n")
 	return b.String(), nil
 }

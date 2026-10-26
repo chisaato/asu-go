@@ -25,6 +25,7 @@ type Config struct {
 	DataDir     string      `yaml:"data_dir"`
 	Admin       Admin       `yaml:"admin"`
 	Queue       Queue       `yaml:"queue"`
+	Build       Build       `yaml:"build"`
 	Store       Store       `yaml:"store"`
 	Stats       Stats       `yaml:"stats"`
 	Runtime     Runtime     `yaml:"runtime"`
@@ -56,7 +57,19 @@ type AdminUser struct {
 type Queue struct {
 	Driver              string        `yaml:"driver"`
 	MaxConcurrentBuilds int           `yaml:"max_concurrent_builds"`
+	MaxPendingJobs      int           `yaml:"max_pending_jobs"`
+	BuildTTL            time.Duration `yaml:"build_ttl"`
+	BuildUnversionedTTL time.Duration `yaml:"build_unversioned_ttl"`
+	BuildDefaultsTTL    time.Duration `yaml:"build_defaults_ttl"`
+	BuildFailureTTL     time.Duration `yaml:"build_failure_ttl"`
 	JobTimeout          time.Duration `yaml:"job_timeout"`
+}
+
+type Build struct {
+	AllowDefaults         bool     `yaml:"allow_defaults"`
+	MaxDefaultsLength     int      `yaml:"max_defaults_length"`
+	MaxCustomRootfsSizeMB int      `yaml:"max_custom_rootfs_size_mb"`
+	RepositoryAllowList   []string `yaml:"repository_allow_list"`
 }
 
 type Store struct {
@@ -94,7 +107,8 @@ func Default() Config {
 		Log:         Log{Format: "json", Level: "info"},
 		DataDir:     "data",
 		Admin:       Admin{SessionTTL: 24 * time.Hour},
-		Queue:       Queue{Driver: "sqlite", MaxConcurrentBuilds: 2, JobTimeout: 10 * time.Minute},
+		Queue:       Queue{Driver: "sqlite", MaxConcurrentBuilds: 2, MaxPendingJobs: 200, JobTimeout: 10 * time.Minute, BuildTTL: 7 * 24 * time.Hour, BuildUnversionedTTL: 24 * time.Hour, BuildDefaultsTTL: 30 * time.Minute, BuildFailureTTL: time.Hour},
+		Build:       Build{MaxDefaultsLength: 20480, MaxCustomRootfsSizeMB: 1024},
 		Store:       Store{Driver: "local"},
 		Stats:       Stats{Driver: "sqlite"},
 		Runtime:     Runtime{Driver: "docker", Socket: "unix:///var/run/docker.sock", PullPolicy: "missing", RollingRecheck: 6 * time.Hour, ScavengerInterval: 5 * time.Minute},
@@ -220,6 +234,10 @@ func (c Config) Validate() error {
 		"runtime.scavenger_interval":     c.Runtime.ScavengerInterval,
 		"admin.session_ttl":              c.Admin.SessionTTL,
 		"queue.job_timeout":              c.Queue.JobTimeout,
+		"queue.build_ttl":                c.Queue.BuildTTL,
+		"queue.build_unversioned_ttl":    c.Queue.BuildUnversionedTTL,
+		"queue.build_defaults_ttl":       c.Queue.BuildDefaultsTTL,
+		"queue.build_failure_ttl":        c.Queue.BuildFailureTTL,
 		"metadata.refresh_interval":      c.Metadata.RefreshInterval,
 		"metadata.cache_ttl":             c.Metadata.CacheTTL,
 		"diagnostics.retention":          c.Diagnostics.Retention,
@@ -231,6 +249,15 @@ func (c Config) Validate() error {
 	}
 	if c.Queue.MaxConcurrentBuilds <= 0 {
 		return errors.New("queue.max_concurrent_builds: 必须大于 0")
+	}
+	if c.Queue.MaxPendingJobs <= 0 {
+		return errors.New("queue.max_pending_jobs: 必须大于 0")
+	}
+	if c.Build.MaxDefaultsLength <= 0 {
+		return errors.New("build.max_defaults_length: 必须大于 0")
+	}
+	if c.Build.MaxCustomRootfsSizeMB <= 0 {
+		return errors.New("build.max_custom_rootfs_size_mb: 必须大于 0")
 	}
 	if c.Diagnostics.MaxKept < 0 {
 		return errors.New("diagnostics.max_kept: 不得小于 0")

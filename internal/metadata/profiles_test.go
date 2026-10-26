@@ -156,3 +156,48 @@ func TestOpenWrtSmoke(t *testing.T) {
 	encoded, _ := json.Marshal(profile["linux_kernel"])
 	t.Logf("profile=%v kernel=%s packages=%d kmod-tun=%s", profile["id"], encoded, len(packages), packages["kmod-tun"])
 }
+
+func TestResolveBuildProfile(t *testing.T) {
+	for _, tc := range []struct{ name, profiles, requested, want string }{
+		{"alias", `{"board":{"supported_devices":["vendor,model"]}}`, "vendor_model", "board"},
+		{"generic", `{"generic":{}}`, "unknown", "generic"},
+		{"missing", `{"board":{}}`, "unknown", ""},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				_, _ = fmt.Fprintf(w, `{"default_packages":["base"],"profiles":%s}`, tc.profiles)
+			}))
+			defer upstream.Close()
+			ctx := context.Background()
+			database, err := db.Open(ctx, t.TempDir())
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer func() { _ = database.Close() }()
+			if err = database.Migrate(ctx); err != nil {
+				t.Fatal(err)
+			}
+			store := sources.NewStore(database)
+			source := sources.NewSource()
+			source.Distribution = "openwrt"
+			source.Version = "24.10.0"
+			source.Branch = "24.10"
+			source.Image = "test"
+			source.UpstreamURL = upstream.URL
+			if _, err = store.Create(ctx, source); err != nil {
+				t.Fatal(err)
+			}
+			s := &Service{Store: store, Cache: &Cache{Dir: t.TempDir(), TTL: time.Hour, Client: NewClient("test")}}
+			profile, err := s.ResolveBuildProfile(ctx, "openwrt", "24.10.0", "x86/64", tc.requested)
+			if tc.want == "" {
+				if _, ok := err.(*ProfileNotFoundError); !ok {
+					t.Fatal(err)
+				}
+				return
+			}
+			if err != nil || profile["id"] != tc.want || profile["profiles"] != nil {
+				t.Fatal(profile, err)
+			}
+		})
+	}
+}

@@ -11,6 +11,7 @@
 - `ArtifactDir` 必须指定，建议使用任务专属空临时目录：成功后再由存储层发布，失败后由调用方删除临时目录。Runner 拒绝 tar 路径穿越、链接及特殊文件，普通文件修正为 0644，新建目录为 0755。
 - `OnHandle(ctx, handle)` 在 Create 后、输入注入前调用，用于同步持久化不透明句柄。`OnStage(ctx, Stage{Name, At})` 按日志标记顺序调用，用于更新 `jobs.stage/stages`；回调错误会终止任务并清理。回调应迅速返回并遵守 context。
 - `Result` 返回 `Handle`、`Stages`、`ExitCode`、`ArtifactDir`。句柄成功时也返回，但对应资源已经删除。未获得退出码时 `ExitCode=-1`。
+- `DiffPackages=true` 时依据实际 `make info` 的默认包与 profile 包计算删除列表；构建完成额外导出 `manifest` 与 `build_cmd_packages`，供普通任务和重启接管统一组装公开结果。`Runner.BuildScript` 仅供受信任测试组装注入，nil 仍使用生产 `Script`。
 - 使用 `errors.As(err, *Error)` 检查 `Kind=failed|timeout|cancelled`、`ExitCode`、`Tail`；`errors.Is` 可识别 context 错误。失败文本保留最多 16 KiB 日志尾部，空间不足附加原版友好报错。
 - `KeepContainer=true` 仅在普通构建失败时保留资源，仍执行 Kill；取消/超时始终删除。创建时打 `asu.keep_container=true` label，由 Scavenger 执行 TTL 与数量回收。
 
@@ -30,6 +31,7 @@
 - `Runtime.Inspect(ctx,h) (State,error)`：Exists=false 表示不存在；State 提供 Running、Labels、CreatedAt、FinishedAt。`Runtime.List(ctx)` 仅列本服务标签的运行中/已退出环境。驱动实现封装底层引擎数据，队列不解析 Handle。
 - `Job.Rolling=true` 时 Runner 按 `RollingRecheck`（默认 6h）强制使用 always 拉取，间隔内仍使用 Job.PullPolicy/驱动默认策略。成功检查时间按镜像保存在 **Runner 实例内存**，失败不会更新时间，进程重启或新实例首次使用均重新检查；应复用同一个 Runner。serve 已映射 `runtime.rolling_recheck`，未来队列由 source.rolling 设置 Job.Rolling。
 - 当前 serve 的 errgroup 已持有 Takeover 和 Scavenger；无任务时与空表兼容，但启动需要可用且日志可读的运行时。Takeover 的正常返回不会终止服务，关闭时取消在途任务并等待清理。
+- build-api/02 已通过 `queue.SQLite.Run` 持有 Takeover、发布兼容结果后启动 queued worker pool；同一个 SQLiteJobStore/Hub 支持管理日志，完成落库后释放 Hub ring。Takeover 可选调用存储的 `RecordStage` 同步重放阶段。
 
 集成验证：
 

@@ -1,0 +1,54 @@
+//go:build integration
+
+package api
+
+import (
+	"fmt"
+	"os"
+	"testing"
+
+	"github.com/gzzchh/asu-go/internal/runner"
+	"github.com/gzzchh/asu-go/internal/runtime"
+)
+
+func TestPodmanBuildSubmitPoll(t *testing.T) {
+	socket := os.Getenv("ASU_TEST_RUNTIME_SOCKET")
+	if socket == "" {
+		socket = "unix:///var/run/docker.sock"
+	}
+	driver := os.Getenv("ASU_TEST_RUNTIME_DRIVER")
+	if driver == "" {
+		driver = "podman"
+	}
+	rt, err := runtime.Open(driver, runtime.Options{Socket: socket})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = rt.Close() })
+	h := newBuildHarness(t)
+	h.q.Runner.Runtime = rt
+	// 只在测试中注入小脚本；生产仍使用 Runner.Script 与 ImageBuilder。
+	h.q.Runner.BuildScript = func(j runner.Job) (string, error) {
+		return fmt.Sprintf(`set -eu
+echo '##asu:stage=container_setup'
+echo '##asu:stage=validate_manifest'
+echo '##asu:stage=building_image'
+sleep 1
+mkdir -p /builder/%s
+printf 'firmware' > /builder/%s/firmware.bin
+printf 'base - 1\nluci - 2\n' > /builder/%s/manifest
+printf 'base luci\n' > /builder/%s/build_cmd_packages
+printf '%%s' '{"source_date_epoch":1700000000,"profiles":{"generic":{"images":[{"name":"firmware.bin","type":"sysupgrade"}]}}}' > /builder/%s/profiles.json
+`, j.ID, j.ID, j.ID, j.ID, j.ID), nil
+	}
+	h.start()
+	w, queued := h.call("POST", "/api/v1/build", buildBody)
+	if w.Code != 202 {
+		t.Fatal(w.Code, queued)
+	}
+	id := queued["request_hash"].(string)
+	result := h.poll(id, 200)
+	if result["detail"] != "done" || result["bin_dir"] != id || result["id"] != "generic" {
+		t.Fatal(result)
+	}
+}

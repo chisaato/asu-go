@@ -25,6 +25,45 @@ type ProfileProvider interface {
 
 var _ ProfileProvider = (*Service)(nil)
 
+// ResolveBuildProfile 对照 reload_profiles：supported_devices 逗号替换及唯一 generic 回退。
+// 公开 Profile 端点仍只接受 profile ID。
+func (s *Service) ResolveBuildProfile(ctx context.Context, distro, version, target, profile string) (map[string]any, error) {
+	source, err := s.source(ctx, distro, version)
+	if err != nil {
+		return nil, err
+	}
+	data, err := s.profiles(ctx, source, VersionPath(version)+"/targets/"+target)
+	if err != nil {
+		return nil, err
+	}
+	profiles, _ := data["profiles"].(map[string]any)
+	aliases := map[string]string{}
+	for id, value := range profiles {
+		aliases[strings.ReplaceAll(id, ",", "_")] = id
+		p, _ := value.(map[string]any)
+		devices, _ := p["supported_devices"].([]any)
+		for _, device := range devices {
+			if name, ok := device.(string); ok {
+				aliases[strings.ReplaceAll(name, ",", "_")] = id
+			}
+		}
+	}
+	id, ok := aliases[profile]
+	if !ok && len(aliases) == 1 {
+		id, ok = aliases["generic"]
+	}
+	if !ok {
+		return nil, &ProfileNotFoundError{Profile: profile}
+	}
+	p, _ := profiles[id].(map[string]any)
+	delete(data, "profiles")
+	for k, v := range p {
+		data[k] = v
+	}
+	data["id"] = id
+	return data, nil
+}
+
 type ProfileNotFoundError struct{ Profile string }
 
 func (e *ProfileNotFoundError) Error() string { return "Profile not found: " + e.Profile }

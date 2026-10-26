@@ -20,7 +20,17 @@ admin:
 queue:
   driver: sqlite
   max_concurrent_builds: 2
+  max_pending_jobs: 200
   job_timeout: 10m
+  build_ttl: 168h
+  build_unversioned_ttl: 24h
+  build_defaults_ttl: 30m
+  build_failure_ttl: 1h
+build:
+  allow_defaults: false
+  max_defaults_length: 20480
+  max_custom_rootfs_size_mb: 1024
+  repository_allow_list: null
 store:
   driver: local
 stats:
