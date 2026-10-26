@@ -14,6 +14,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/gzzchh/asu-go/internal/config"
 	"github.com/gzzchh/asu-go/internal/logging"
+	"github.com/gzzchh/asu-go/internal/webui"
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
 )
@@ -29,6 +30,7 @@ func runServe(parent context.Context, cfg config.Config) error {
 	defer stop()
 	gin.SetMode(gin.ReleaseMode)
 	router := gin.New()
+	webui.Register(router)
 	router.Use(func(c *gin.Context) {
 		defer func() {
 			if recovered := recover(); recovered != nil {

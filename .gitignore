@@ -1,3 +1,7 @@
-/web/dist/
+/web/dist/*
+!/web/dist/placeholder.html
+/web/node_modules/
+/web/.nuxt/
+/web/.output/
 /data/
 /bin/
