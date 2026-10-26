@@ -1,6 +1,7 @@
 package admin
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"os"
@@ -20,6 +21,19 @@ func (w flushingWriter) Write(p []byte) (int, error) {
 // RegisterLogs 必须挂载到已应用 RequireAuth 的管理路由组。
 func RegisterLogs(group *gin.RouterGroup, service stream.Service) {
 	group.GET("/jobs/:id/log", func(c *gin.Context) {
+		if retained, ok := service.Jobs.(interface {
+			LogVisible(context.Context, string) (bool, error)
+		}); ok {
+			visible, err := retained.LogVisible(c.Request.Context(), c.Param("id"))
+			if err != nil {
+				c.JSON(500, gin.H{"error": "internal error"})
+				return
+			}
+			if !visible {
+				c.JSON(404, gin.H{"error": "job not found"})
+				return
+			}
+		}
 		log, err := service.Open(c.Request.Context(), c.Param("id"), c.Query("follow") == "1")
 		if err != nil {
 			status := http.StatusInternalServerError

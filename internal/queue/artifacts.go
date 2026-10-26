@@ -152,6 +152,21 @@ func readResult(dir, profile, id string) (map[string]any, error) {
 
 // Complete 同时用于普通 worker 与 Runner.Takeover，不暴露 Runner.Result 的内部字段。
 func (q *SQLite) Complete(ctx context.Context, id string, result runner.Result, runErr error) error {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	var cancelled bool
+	if err := q.DB.QueryRowContext(ctx, `SELECT COALESCE(detail,'')='cancelled' FROM jobs WHERE request_hash=?`, id).Scan(&cancelled); err != nil {
+		return err
+	}
+	if cancelled {
+		// 取消也可能落在 Runner 返回与 Complete 之间；此时失败环境可能已被保留。
+		// 再次幂等清理，保证管理员取消永远不保留容器。
+		var cleanupErr error
+		if result.Handle != "" {
+			cleanupErr = errors.Join(q.Runner.Runtime.Kill(ctx, result.Handle), q.Runner.Runtime.Remove(ctx, result.Handle))
+		}
+		runErr = &runner.Error{Kind: "cancelled", Cause: cleanupErr}
+	}
 	var request, profile, status, options string
 	if err := q.DB.QueryRowContext(ctx, `SELECT request,profile,status,COALESCE(options,'{}') FROM jobs WHERE request_hash=?`, id).Scan(&request, &profile, &status, &options); err != nil {
 		return err
@@ -167,8 +182,13 @@ func (q *SQLite) Complete(ctx context.Context, id string, result runner.Result, 
 	if runErr == nil {
 		public, runErr = readResult(result.ArtifactDir, profile, id)
 	}
-	if runErr == nil && !strings.HasPrefix(id, "rp_") {
-		runErr = q.Publisher.Publish(ctx, id, result.ArtifactDir)
+	if runErr == nil {
+		if strings.HasPrefix(id, "rp_") {
+			// 诊断产物单独保存，不进入公开 store 命名空间。
+			runErr = (DirectoryPublisher{Root: filepath.Join(q.Options.DataDir, "diagnostics")}).Publish(ctx, id, result.ArtifactDir)
+		} else {
+			runErr = q.Publisher.Publish(ctx, id, result.ArtifactDir)
+		}
 	}
 	if result.ArtifactDir != "" && runErr != nil {
 		_ = os.RemoveAll(result.ArtifactDir)

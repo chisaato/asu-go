@@ -20,6 +20,10 @@ import (
 type sourceClient struct{ server, token string }
 
 func (client sourceClient) request(cmd *cobra.Command, method, path string, input, output any) error {
+	return client.adminRequest(cmd, method, "/sources"+path, input, output)
+}
+
+func (client sourceClient) adminRequest(cmd *cobra.Command, method, path string, input, output any) error {
 	u, err := url.Parse(client.server)
 	if err != nil || u.Host == "" || (u.Scheme != "http" && u.Scheme != "https") {
 		return fmt.Errorf("--server 必须是 HTTP(S) 地址")
@@ -32,7 +36,7 @@ func (client sourceClient) request(cmd *cobra.Command, method, path string, inpu
 		}
 		body = bytes.NewReader(data)
 	}
-	req, err := http.NewRequestWithContext(cmd.Context(), method, strings.TrimRight(client.server, "/")+"/admin/api/sources"+path, body)
+	req, err := http.NewRequestWithContext(cmd.Context(), method, strings.TrimRight(client.server, "/")+"/admin/api"+path, body)
 	if err != nil {
 		return err
 	}

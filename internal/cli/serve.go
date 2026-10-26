@@ -94,6 +94,7 @@ func runServe(parent context.Context, cfg config.Config) error {
 		Limits: buildreq.Limits{AllowDefaults: cfg.Build.AllowDefaults, MaxDefaultsLength: cfg.Build.MaxDefaultsLength, MaxCustomRootfsSizeMB: cfg.Build.MaxCustomRootfsSizeMB, RepositoryAllowList: cfg.Build.RepositoryAllowList},
 	})
 	admin.RegisterLogs(adminGroup, stream.Service{Hub: hub, Jobs: jobs})
+	admin.RegisterJobs(adminGroup, jobs)
 	api.RegisterBuild(router, jobs)
 	router.GET("/healthz", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"status": "ok"})

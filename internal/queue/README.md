@@ -15,3 +15,13 @@
 - 本 issue 不迁移原版 package_changes.py 的历史版本包名修正规则；显式选包按规范化请求执行。
 
 人工 owut/LuCI 完整固件构建留待真实设备及正式 ImageBuilder 环境；本 issue 使用 Fake 和 Podman 小镜像脚本验证协议全链路。
+
+## 取消与诊断重放
+
+`admin.RegisterJobs` 在已鉴权组挂载 jobs 列表/详情、cancel 与 replay；列表支持状态与分页，详情和日志按 `purge_at` 保留。`Cancel` 与 claim/完成串行，running 先持久写入取消标记再取消任务 context；`ExecutionContext` 覆盖普通 worker 和 Takeover，避免 claim/注册及重启窗口丢失取消。已完成任务返回 409。
+
+`Replay` 共享请求规范化/模型和元数据校验，不调用公开 Submit，不写 stat_counters。标准库生成独立 `rp_<ulid>`，默认 verbose/keep_container，支持 tag/pull_policy 覆盖与显式 `skip_limits`。原任务不变，公开 GET/HEAD 永远不可见；成功产物存入 `diagnostics/{id}`，不发布到 store。失败容器沿用 Scavenger，取消/超时仍删除。
+
+CLI `asu replay <hash>` 或 `asu replay -f request.json`（`-` 为 stdin）复用 source 的管理 HTTP 客户端和 token 优先级；支持 `--verbose=false`、`--no-keep-container`、`--image-tag`、`--pull-policy`，输出新 id。可选 `--follow` 未实现，日志使用管理端 log 接口。
+
+共享 Podman socket 的集成回归建议串行包执行：`ASU_TEST_RUNTIME_DRIVER=podman ASU_TEST_RUNTIME_SOCKET=unix:///var/run/docker.sock go test -p 1 -tags integration ./internal/api ./internal/runner ./internal/runtime`。诊断回收测试额外限定扫描自己的任务，避免影响其他环境。
