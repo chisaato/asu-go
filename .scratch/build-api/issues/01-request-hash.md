@@ -4,7 +4,7 @@
 
 **Blocked by:** foundation/01
 
-**Status:** ready-for-human
+**Status:** done
 
 - [x] `BuildRequest` 模型与字段校验（对照原版 `asu/build_request.py`、`allow_defaults`、`max_defaults_length`=20480、`max_custom_rootfs_size_mb`=1024、repositories 白名单）
 - [x] 规范 JSON → SHA-256（64 位 hex）；包名去 `+`、去重、排序；null 与空值显式区分

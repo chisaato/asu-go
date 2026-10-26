@@ -4,7 +4,7 @@
 
 **Blocked by:** foundation/01
 
-**Status:** ready-for-human
+**Status:** done
 
 - [x] SQLite（modernc，WAL，busy_timeout）与 goose 内嵌迁移，建 `sources`、`jobs`、`stat_counters`、`kv`（见 `docs/data-model.md`）
 - [x] `asu db migrate`（要求服务未运行）

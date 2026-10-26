@@ -4,7 +4,7 @@
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** done
 
 - [x] Cobra 子命令 `serve`、`config check`、`version`
 - [x] 强类型 YAML 配置：严格解码、全小写 snake_case 显式标签、flag/`ASU_*` 覆盖、带 YAML 路径的校验错误，`configs/asu.example.yaml`

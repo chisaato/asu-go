@@ -4,7 +4,7 @@
 
 **Blocked by:** foundation/01
 
-**Status:** ready-for-agent
+**Status:** done
 
 - [x] `web/`：Bun + Nuxt 4（`ssr:false`、`app.baseURL=/admin/`）+ Nuxt UI v4，仅一个占位页
 - [x] `bun run generate` → `web/dist` → `web/embed.go` 嵌入；Go 接管 `/admin` 并处理 SPA 回退
