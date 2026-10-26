@@ -4,13 +4,13 @@
 
 **Blocked by:** foundation/02
 
-**Status:** ready-for-human
+**Status:** done（Docker 真机验证待补：本机无 dockerd）
 
 - [x] `Runtime` 接口（含 put/get archive）、不透明 `Handle`、fake 实现
 - [x] Docker 驱动（Moby client），Podman 经兼容 socket
 - [x] 启动检测：引擎与版本、日志驱动可读（`none` 拒绝启动）
 - [x] 容器参数：无 AutoRemove、无宿主 bind mount、`cap_drop=all`、`no_new_privileges`、网络 `asu-build` 自动创建、label `managed-by=asu-go`
-- [ ] `integration` tag 测试在 Docker 与 Podman 上通过
+- [~] `integration` tag 测试：Podman 通过；Docker 因本机无 dockerd 未验证
 
 Parent spec: `.scratch/runtime-runner/spec.md`
 
