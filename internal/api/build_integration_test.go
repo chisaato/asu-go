@@ -4,6 +4,7 @@ package api
 
 import (
 	"fmt"
+	"net/http/httptest"
 	"os"
 	"testing"
 
@@ -50,5 +51,10 @@ printf '%%s' '{"source_date_epoch":1700000000,"profiles":{"generic":{"images":[{
 	result := h.poll(id, 200)
 	if result["detail"] != "done" || result["bin_dir"] != id || result["id"] != "generic" {
 		t.Fatal(result)
+	}
+	download := httptest.NewRecorder()
+	h.router.ServeHTTP(download, httptest.NewRequest("GET", "/store/"+id+"/firmware.bin", nil))
+	if download.Code != 200 || download.Body.String() != "firmware" {
+		t.Fatal(download)
 	}
 }

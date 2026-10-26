@@ -1,4 +1,4 @@
-// Package store 定义产物存储驱动注册；文件操作在存储实现阶段补齐。
+// Package store 定义产物存储接口与本地安全存储实现。
 package store
 
 import "github.com/gzzchh/asu-go/internal/driver"
