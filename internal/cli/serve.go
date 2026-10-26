@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 	"time"
 
@@ -18,6 +19,8 @@ import (
 	"github.com/gzzchh/asu-go/internal/db"
 	"github.com/gzzchh/asu-go/internal/logging"
 	"github.com/gzzchh/asu-go/internal/metadata"
+	"github.com/gzzchh/asu-go/internal/runner"
+	"github.com/gzzchh/asu-go/internal/runtime"
 	"github.com/gzzchh/asu-go/internal/sources"
 	"github.com/gzzchh/asu-go/internal/stream"
 	"github.com/gzzchh/asu-go/internal/webui"
@@ -74,8 +77,17 @@ func runServe(parent context.Context, cfg config.Config) error {
 		return fmt.Errorf("日志 Hub: %w", err)
 	}
 	defer func() { _ = hub.Close() }()
-	// jobs/队列接入时替换此内存适配；当前已可读取落盘历史日志。
-	admin.RegisterLogs(adminGroup, stream.Service{Hub: hub, Jobs: stream.NewMemoryJobSource()})
+	jobs := &runner.SQLiteJobStore{DB: database.DB}
+	admin.RegisterLogs(adminGroup, stream.Service{Hub: hub, Jobs: jobs})
+	rt, err := runtime.Open(cfg.Runtime.Driver, runtime.Options{Socket: cfg.Runtime.Socket, MemoryLimit: cfg.Runtime.MemoryLimit, CPUs: cfg.Runtime.CPUs, PullPolicy: cfg.Runtime.PullPolicy})
+	if err != nil {
+		return err
+	}
+	defer func() { _ = rt.Close() }()
+	if _, err := rt.Info(ctx); err != nil {
+		return err
+	}
+	buildRunner := &runner.Runner{Runtime: rt, Hub: hub, JobTimeout: cfg.Queue.JobTimeout, RollingRecheck: cfg.Runtime.RollingRecheck}
 	router.GET("/healthz", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"status": "ok"})
 	})
@@ -90,6 +102,9 @@ func runServe(parent context.Context, cfg config.Config) error {
 		BaseContext:       func(net.Listener) context.Context { return ctx },
 	}
 	group, groupCtx := errgroup.WithContext(ctx)
+	group.Go(func() error { return buildRunner.Takeover(groupCtx, jobs, filepath.Join(cfg.DataDir, "recovery")) })
+	scavenger := &runner.Scavenger{Runtime: rt, Jobs: jobs, Interval: cfg.Runtime.ScavengerInterval, KeepContainerTTL: cfg.Diagnostics.KeepContainerTTL, MaxKept: cfg.Diagnostics.MaxKept}
+	group.Go(func() error { return scavenger.Run(groupCtx) })
 	syncer := &metadata.Syncer{Store: catalog, Client: upstream, Logger: logger.With(zap.String("component", "metadata"))}
 	group.Go(func() error { return syncer.Run(groupCtx, cfg.Metadata.RefreshInterval) })
 	group.Go(func() error {

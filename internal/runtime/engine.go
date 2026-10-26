@@ -15,6 +15,7 @@ import (
 	"net/http"
 	"strings"
 	"sync"
+	"time"
 )
 
 const buildNetwork = "asu-build"
@@ -193,6 +194,44 @@ func (e *engine) Remove(ctx context.Context, h Handle) error {
 		return nil
 	}
 	return err
+}
+
+func (e *engine) Inspect(ctx context.Context, h Handle) (State, error) {
+	r, err := e.client.ContainerInspect(ctx, string(h), client.ContainerInspectOptions{})
+	if errdefs.IsNotFound(err) {
+		return State{Handle: h}, nil
+	}
+	if err != nil {
+		return State{}, err
+	}
+	s := State{Handle: h, Exists: true, Labels: r.Container.Config.Labels}
+	s.CreatedAt, _ = time.Parse(time.RFC3339Nano, r.Container.Created)
+	if r.Container.State != nil {
+		s.Running = r.Container.State.Running
+		s.FinishedAt, _ = time.Parse(time.RFC3339Nano, r.Container.State.FinishedAt)
+	}
+	return s, nil
+}
+
+func (e *engine) List(ctx context.Context) ([]State, error) {
+	r, err := e.client.ContainerList(ctx, client.ContainerListOptions{All: true, Filters: client.Filters{}.Add("label", "managed-by=asu-go")})
+	if err != nil {
+		return nil, err
+	}
+	var states []State
+	for _, c := range r.Items {
+		if c.Labels["managed-by"] != "asu-go" {
+			continue
+		}
+		s, err := e.Inspect(ctx, Handle(c.ID))
+		if err != nil {
+			return nil, err
+		}
+		if s.Exists {
+			states = append(states, s)
+		}
+	}
+	return states, nil
 }
 
 // 每个 reader 拥有解帧协程，Close 关闭源并等待退出。

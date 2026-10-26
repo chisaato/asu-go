@@ -68,11 +68,13 @@ type Stats struct {
 }
 
 type Runtime struct {
-	Driver      string  `yaml:"driver"`
-	Socket      string  `yaml:"socket"`
-	MemoryLimit int64   `yaml:"memory_limit"`
-	CPUs        float64 `yaml:"cpus"`
-	PullPolicy  string  `yaml:"pull_policy"`
+	RollingRecheck    time.Duration `yaml:"rolling_recheck"`
+	ScavengerInterval time.Duration `yaml:"scavenger_interval"`
+	Driver            string        `yaml:"driver"`
+	Socket            string        `yaml:"socket"`
+	MemoryLimit       int64         `yaml:"memory_limit"`
+	CPUs              float64       `yaml:"cpus"`
+	PullPolicy        string        `yaml:"pull_policy"`
 }
 
 type Metadata struct {
@@ -95,7 +97,7 @@ func Default() Config {
 		Queue:       Queue{Driver: "sqlite", MaxConcurrentBuilds: 2, JobTimeout: 10 * time.Minute},
 		Store:       Store{Driver: "local"},
 		Stats:       Stats{Driver: "sqlite"},
-		Runtime:     Runtime{Driver: "docker", Socket: "unix:///var/run/docker.sock", PullPolicy: "missing"},
+		Runtime:     Runtime{Driver: "docker", Socket: "unix:///var/run/docker.sock", PullPolicy: "missing", RollingRecheck: 6 * time.Hour, ScavengerInterval: 5 * time.Minute},
 		Metadata:    Metadata{RefreshInterval: time.Hour, CacheTTL: time.Hour},
 		Diagnostics: Diagnostics{Retention: 7 * 24 * time.Hour, KeepContainerTTL: time.Hour, MaxKept: 3},
 	}
@@ -214,6 +216,8 @@ func (c Config) Validate() error {
 		return errors.New("runtime.pull_policy: 仅支持 missing、always 或 never")
 	}
 	for path, value := range map[string]time.Duration{
+		"runtime.rolling_recheck":        c.Runtime.RollingRecheck,
+		"runtime.scavenger_interval":     c.Runtime.ScavengerInterval,
 		"admin.session_ttl":              c.Admin.SessionTTL,
 		"queue.job_timeout":              c.Queue.JobTimeout,
 		"metadata.refresh_interval":      c.Metadata.RefreshInterval,

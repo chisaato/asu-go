@@ -3,6 +3,7 @@ package runtime
 import (
 	"context"
 	"io"
+	"time"
 )
 
 // Handle 是可持久化的不透明值，只能保存、恢复并传回驱动。
@@ -21,6 +22,14 @@ type LogsOptions struct {
 }
 type ExitStatus struct{ Code int64 }
 type Info struct{ Name, Version, LoggingDriver string }
+
+// State 不暴露引擎状态对象；Exists=false 表示句柄对应资源已消失。
+type State struct {
+	Handle                Handle
+	Exists, Running       bool
+	Labels                map[string]string
+	CreatedAt, FinishedAt time.Time
+}
 
 // Options 由配置组装层映射，避免 runtime 反向依赖 config。
 type Options struct {
@@ -41,6 +50,9 @@ type Runtime interface {
 	// Kill 保留日志和产物；Remove 最终清理，两者均幂等。
 	Kill(context.Context, Handle) error
 	Remove(context.Context, Handle) error
+	Inspect(context.Context, Handle) (State, error)
+	// List 仅返回 managed-by=asu-go 的资源，包含已经退出的资源。
+	List(context.Context) ([]State, error)
 	Info(context.Context) (Info, error)
 	Close() error
 }

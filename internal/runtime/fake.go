@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"strings"
 	"sync"
 	"time"
 )
@@ -25,12 +26,13 @@ type Fake struct {
 	seq  int
 }
 type fakeJob struct {
-	spec     RunSpec
-	plan     FakePlan
-	start    time.Time
-	killed   chan struct{}
-	killOnce sync.Once
-	inputs   map[string][]byte
+	spec              RunSpec
+	plan              FakePlan
+	start             time.Time
+	killed            chan struct{}
+	killOnce          sync.Once
+	inputs            map[string][]byte
+	created, finished time.Time
 }
 
 func NewFake() *Fake                                           { return &Fake{jobs: make(map[Handle]*fakeJob)} }
@@ -49,7 +51,7 @@ func (f *Fake) Create(ctx context.Context, spec RunSpec) (Handle, error) {
 	h := Handle(fmt.Sprintf("fake-%d", f.seq))
 	p := f.Next
 	p.Archives = cloneArchives(p.Archives)
-	f.jobs[h] = &fakeJob{spec: spec, plan: p, killed: make(chan struct{}), inputs: make(map[string][]byte)}
+	f.jobs[h] = &fakeJob{spec: spec, plan: p, killed: make(chan struct{}), inputs: make(map[string][]byte), created: time.Now()}
 	return h, nil
 }
 func cloneArchives(in map[string][]byte) map[string][]byte {
@@ -152,7 +154,7 @@ func (f *Fake) Kill(ctx context.Context, h Handle) error {
 	defer f.mu.Unlock()
 	j := f.jobs[h]
 	if j != nil {
-		j.killOnce.Do(func() { close(j.killed) })
+		j.killOnce.Do(func() { j.finished = time.Now(); close(j.killed) })
 	}
 	return nil
 }
@@ -203,8 +205,56 @@ func (f *Fake) Logs(ctx context.Context, h Handle, opts LogsOptions) (io.ReadClo
 		return nil, err
 	}
 	ctx, cancel := context.WithCancel(ctx)
-	return &fakeLogs{Reader: bytes.NewBufferString(j.plan.Output), ctx: ctx, cancel: cancel, f: f, h: h, follow: opts.Follow, closed: make(chan struct{})}, nil
+	output := j.plan.Output
+	if opts.Timestamps {
+		var b strings.Builder
+		for _, line := range strings.SplitAfter(output, "\n") {
+			if line != "" {
+				b.WriteString(j.start.UTC().Format(time.RFC3339Nano) + " " + line)
+			}
+		}
+		output = b.String()
+	}
+	return &fakeLogs{Reader: bytes.NewBufferString(output), ctx: ctx, cancel: cancel, f: f, h: h, follow: opts.Follow, closed: make(chan struct{})}, nil
 }
 
 var _ Runtime = (*Fake)(nil)
 var _ Runtime = (*engine)(nil)
+
+func (f *Fake) state(h Handle, j *fakeJob) State {
+	s := State{Handle: h, Exists: true, CreatedAt: j.created, FinishedAt: j.finished,
+		Labels: map[string]string{"managed-by": "asu-go", "asu.request_hash": j.spec.RequestHash}}
+	if j.spec.KeepContainer {
+		s.Labels["asu.keep_container"] = "true"
+	}
+	if !j.start.IsZero() && s.FinishedAt.IsZero() {
+		s.Running = time.Now().Before(j.start.Add(j.plan.Delay))
+		if !s.Running {
+			s.FinishedAt = j.start.Add(j.plan.Delay)
+		}
+	}
+	return s
+}
+func (f *Fake) Inspect(ctx context.Context, h Handle) (State, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if err := ctx.Err(); err != nil {
+		return State{}, err
+	}
+	if j := f.jobs[h]; j != nil {
+		return f.state(h, j), nil
+	}
+	return State{Handle: h}, nil
+}
+func (f *Fake) List(ctx context.Context) ([]State, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	var out []State
+	for h, j := range f.jobs {
+		out = append(out, f.state(h, j))
+	}
+	return out, nil
+}

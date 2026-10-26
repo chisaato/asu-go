@@ -3,6 +3,7 @@
 package runner
 
 import (
+	"bufio"
 	"context"
 	"errors"
 	"os"
@@ -16,6 +17,120 @@ import (
 	"github.com/gzzchh/asu-go/internal/stream"
 	"golang.org/x/sync/errgroup"
 )
+
+func TestPodmanTakeoverAndScavenge(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 40*time.Second)
+	defer cancel()
+	socket := os.Getenv("ASU_TEST_RUNTIME_SOCKET")
+	if socket == "" {
+		socket = "unix:///var/run/docker.sock"
+	}
+	driver := os.Getenv("ASU_TEST_RUNTIME_DRIVER")
+	if driver == "" {
+		driver = "podman"
+	}
+	rt, err := runtime.Open(driver, runtime.Options{Socket: socket})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = rt.Close() }()
+	dataDir := t.TempDir()
+	hub, err := stream.NewHub(dataDir, 100)
+	if err != nil {
+		t.Fatal(err)
+	}
+	first := &Runner{Runtime: rt, Hub: hub}
+	j := Job{ID: "takeover-integration", Image: "docker.io/library/alpine:latest", ArtifactDir: t.TempDir()}
+	if err := first.Runtime.Prepare(ctx, runtime.ImageSpec{Reference: j.Image}); err != nil {
+		t.Fatal(err)
+	}
+	h, err := first.Runtime.Create(ctx, runtime.RunSpec{Image: j.Image, WorkingDir: "/builder", RequestHash: j.ID, Command: []string{"sh", "-ec", "echo first; sleep 2; echo second; sleep 1; mkdir -p /builder/takeover-integration; echo artifact > /builder/takeover-integration/firmware.bin; echo last"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = rt.Remove(context.Background(), h) }()
+	if err := first.Runtime.Start(ctx, h); err != nil {
+		t.Fatal(err)
+	}
+	if err := first.Hub.Begin(j.ID); err != nil {
+		t.Fatal(err)
+	}
+	reader, err := first.Runtime.Logs(ctx, h, runtime.LogsOptions{Follow: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	scanner := bufio.NewScanner(reader)
+	if !scanner.Scan() || scanner.Text() != "first" {
+		t.Fatal("缺少重启前首行", scanner.Text(), scanner.Err())
+	}
+	if err := first.Hub.Append(j.ID, scanner.Text()+"\n"); err != nil {
+		t.Fatal(err)
+	}
+	// 模拟崩溃：仅关闭宿主日志连接，不触发 Run 的正常取消清理。
+	if err := reader.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := first.Hub.Close(); err != nil {
+		t.Fatal(err)
+	}
+	state, err := rt.Inspect(ctx, h)
+	if err != nil || !state.Running {
+		t.Fatal("接管前容器未运行", state, err)
+	}
+	hub, err = stream.NewHub(dataDir, 100)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = hub.Close() }()
+	restarted := &Runner{Runtime: rt, Hub: hub}
+	result, err := restarted.Resume(ctx, j, h)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.ExitCode != 0 || strings.Join(hub.Tail(j.ID), "") != "first\nsecond\nlast\n" {
+		t.Fatal(result, hub.Tail(j.ID))
+	}
+	data, err := os.ReadFile(filepath.Join(dataDir, "logs", j.ID+".log"))
+	if err != nil || string(data) != "first\nsecond\nlast\n" {
+		t.Fatal(string(data), err)
+	}
+	data, err = os.ReadFile(filepath.Join(j.ArtifactDir, "firmware.bin"))
+	if err != nil || string(data) != "artifact\n" {
+		t.Fatal(string(data), err)
+	}
+	state, err = rt.Inspect(ctx, h)
+	if err != nil || state.Exists {
+		t.Fatal(state, err)
+	}
+	// 将所有已有服务环境视为活跃，只回收本测试新产生的孤儿，避免影响使用者。
+	states, err := rt.List(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	jobs := &memoryJobs{}
+	for _, state := range states {
+		jobs.tasks = append(jobs.tasks, Task{ID: state.Labels["asu.request_hash"], Handle: state.Handle, Status: "running"})
+	}
+	orphan, err := rt.Create(ctx, runtime.RunSpec{Image: j.Image, RequestHash: "scavenger-integration", Command: []string{"sleep", "30"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = rt.Remove(context.Background(), orphan) }()
+	if err := rt.Start(ctx, orphan); err != nil {
+		t.Fatal(err)
+	}
+	if err := rt.Kill(ctx, orphan); err != nil {
+		t.Fatal(err)
+	}
+	s := &Scavenger{Runtime: rt, Jobs: jobs, MaxKept: 3}
+	if err := s.Sweep(ctx); err != nil {
+		t.Fatal(err)
+	}
+	state, err = rt.Inspect(ctx, orphan)
+	if err != nil || state.Exists {
+		t.Fatal("孤儿没有被清理", state, err)
+	}
+}
 
 // 模拟 ImageBuilder 的 make，脚本作为容器主进程的子进程运行，不使用 exec API。
 const fakeMake = `#!/bin/sh
