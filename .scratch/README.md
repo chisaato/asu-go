@@ -13,7 +13,7 @@ foundation → (sources-metadata ∥ runtime-runner) → build-api → store-ttl
 | foundation | 01 skeleton → 02 sqlite-drivers |
 | sources-metadata | 01 catalog-cli → 02 versions-targets-sync → 03 profiles-index-cache |
 | runtime-runner | 01 runtime-drivers → 02 runner-log-stream → 03 takeover-scavenger |
-| build-api | 01 request-hash；02 submit-poll；03 cancel-replay |
+| build-api | 01 request-hash；02 submit-poll；03 cancel-replay；04 package-changes（后补） |
 | store-ttl | 01 store-download → 02 ttl-cleaner |
 | admin-skeleton | 01 admin-auth；02 nuxt-embed-pipeline（只依赖 foundation/01，可提前）；03 task-list-page |
 
