@@ -12,6 +12,7 @@ type RunSpec struct {
 	Image                         string
 	Command, Env                  []string
 	WorkingDir, User, RequestHash string
+	KeepContainer                 bool
 }
 type LogsOptions struct {
 	Follow     bool
