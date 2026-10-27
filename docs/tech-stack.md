@@ -84,6 +84,8 @@ asu version
 3. `Validate()` 集中校验，错误信息带 YAML 路径（如 `runtime.socket`）。
 4. 示例配置位于 `configs/asu.example.yaml`，必须与结构体同步（有测试保证能被严格解码）。
 
+`server.cors.public_origins` 默认 `["*"]`，为 `/api/`、`/json/`、`/store/` 提供无凭据跨域访问；可改为精确来源列表或 `[]` 关闭。`server.cors.admin_origins` 默认 `[]`（同源），仅允许精确来源且启用凭据，禁止通配符；不影响 `/admin` 静态页面。
+
 如果将来出现多层配置合并、热加载等复杂需求，再用 ADR 评估 `koanf`（优先于 Viper）。
 
 ---

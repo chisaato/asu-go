@@ -56,6 +56,29 @@ func TestStrictDecode(t *testing.T) {
 	}
 }
 
+func TestCORSConfig(t *testing.T) {
+	for _, tc := range []struct {
+		input  string
+		public []string
+		admin  []string
+	}{
+		{"{}", []string{"*"}, []string{}},
+		{"server:\n  cors:\n    public_origins: []", []string{}, []string{}},
+		{"server:\n  cors:\n    public_origins: [https://selector.example]\n    admin_origins: [https://admin.example]", []string{"https://selector.example"}, []string{"https://admin.example"}},
+	} {
+		cfg, err := Decode(strings.NewReader(tc.input))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := cfg.Validate(); err != nil {
+			t.Fatal(err)
+		}
+		if !reflect.DeepEqual(cfg.Server.CORS, CORS{PublicOrigins: tc.public, AdminOrigins: tc.admin}) {
+			t.Fatalf("CORS 配置不符: %+v", cfg.Server.CORS)
+		}
+	}
+}
+
 func TestPriority(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "asu.yaml")
 	if err := os.WriteFile(path, []byte("server:\n  listen: ':8100'\nlog:\n  level: warn\ndata_dir: yaml_data\n"), 0o600); err != nil {
@@ -104,6 +127,7 @@ func TestValidationPaths(t *testing.T) {
 		set  func(*Config)
 	}{
 		{"server.listen", func(c *Config) { c.Server.Listen = "invalid" }},
+		{"server.cors.admin_origins", func(c *Config) { c.Server.CORS.AdminOrigins = []string{"https://admin.example", "*"} }},
 		{"log.format", func(c *Config) { c.Log.Format = "invalid" }},
 		{"log.level", func(c *Config) { c.Log.Level = "invalid" }},
 		{"queue.driver", func(c *Config) { c.Queue.Driver = "redis" }},

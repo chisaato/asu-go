@@ -8,6 +8,10 @@
 
 ## 1. 客户端兼容 API (OpenWrt Standard)
 
+### 跨域访问（CORS）
+
+公开 `/api/`、`/json/`、`/store/` 默认返回 `Access-Control-Allow-Origin: *`（不携带凭据），支持 GET、HEAD、POST、OPTIONS，以及 Content-Type、Range、If-Modified-Since、If-None-Match 请求头。浏览器可读取 `X-Imagebuilder-Status`、`X-Queue-Position`、Content-Length、Content-Range、ETag、Last-Modified；预检直接返回 204，缓存 86400 秒。`server.cors.public_origins` 可限制精确来源（回写 Origin 并添加 `Vary: Origin`），或设为 `[]` 关闭；无 Origin 或来源不匹配时不添加 CORS 头。`/admin/api/` 默认仅同源，须在 `server.cors.admin_origins` 配置精确来源（禁止 `*`）才允许携带凭据及 Content-Type、Authorization、X-Requested-With 请求头，预检不经过鉴权；`/admin` 静态页面不受影响。
+
 ### 1.1 元数据与概要接口
 
 #### `GET /json/v1/latest.json`

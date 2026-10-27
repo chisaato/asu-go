@@ -2,6 +2,11 @@
 # 完整字段说明见 configs/asu.example.yaml。
 server:
   listen: ":8000"
+  cors:
+    # 公开 API 与产物默认允许任意来源（无凭据）；精确列表限制来源，[] 关闭。
+    public_origins: ["*"]
+    # 管理 API 默认仅同源；跨域时填精确来源（携带凭据），禁止 *，不影响静态页面。
+    admin_origins: []
 log:
   format: json
   level: info

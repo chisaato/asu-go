@@ -2,6 +2,11 @@
 # 环境变量：ASU_SERVER_LISTEN、ASU_LOG_LEVEL、ASU_DATA_DIR、ASU_ADMIN_TOKEN。
 server:
   listen: ":8000"
+  cors:
+    # 公开 /api/、/json/、/store/：* 不携带凭据；可改为精确来源列表，[] 关闭。
+    public_origins: ["*"]
+    # 管理 /admin/api/：默认仅同源；精确来源启用凭据，禁止 *，不影响 /admin 静态页面。
+    admin_origins: []
 log:
   format: json
   level: info

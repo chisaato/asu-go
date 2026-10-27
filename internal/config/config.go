@@ -37,6 +37,12 @@ type Config struct {
 
 type Server struct {
 	Listen string `yaml:"listen"`
+	CORS   CORS   `yaml:"cors"`
+}
+
+type CORS struct {
+	PublicOrigins []string `yaml:"public_origins"`
+	AdminOrigins  []string `yaml:"admin_origins"`
 }
 
 type Log struct {
@@ -119,7 +125,7 @@ type Diagnostics struct {
 
 func Default() Config {
 	return Config{
-		Server:      Server{Listen: ":8000"},
+		Server:      Server{Listen: ":8000", CORS: CORS{PublicOrigins: []string{"*"}, AdminOrigins: []string{}}},
 		Log:         Log{Format: "json", Level: "info"},
 		DataDir:     "data",
 		Admin:       Admin{SessionTTL: 24 * time.Hour},
@@ -204,6 +210,11 @@ func Load(path string, flags Overrides) (Config, error) {
 }
 
 func (c Config) Validate() error {
+	for _, origin := range c.Server.CORS.AdminOrigins {
+		if strings.Contains(origin, "*") {
+			return errors.New("server.cors.admin_origins: 不允许通配符，必须为精确来源")
+		}
+	}
 	if _, port, err := net.SplitHostPort(c.Server.Listen); err != nil {
 		return fmt.Errorf("server.listen: %w", err)
 	} else if n, err := strconv.Atoi(port); err != nil || n < 0 || n > 65535 {

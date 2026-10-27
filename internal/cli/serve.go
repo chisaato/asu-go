@@ -16,6 +16,7 @@ import (
 	"github.com/gzzchh/asu-go/internal/api"
 	"github.com/gzzchh/asu-go/internal/buildreq"
 	"github.com/gzzchh/asu-go/internal/config"
+	"github.com/gzzchh/asu-go/internal/cors"
 	"github.com/gzzchh/asu-go/internal/db"
 	"github.com/gzzchh/asu-go/internal/logging"
 	"github.com/gzzchh/asu-go/internal/metadata"
@@ -66,6 +67,7 @@ func runServe(parent context.Context, cfg config.Config) error {
 		}()
 		c.Next()
 	})
+	router.Use(cors.New(cfg.Server.CORS))
 	adminGroup, err := admin.RegisterAuth(router, cfg.Admin, logger)
 	if err != nil {
 		return err
