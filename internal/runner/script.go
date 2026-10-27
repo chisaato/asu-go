@@ -58,7 +58,10 @@ func Script(j Job) (string, error) {
 	}
 	common := " " + quote("PROFILE="+j.Profile) + " \"PACKAGES=$packages\""
 	b.WriteString("stage validate_manifest\n")
-	b.WriteString("capture .asu-manifest make manifest" + common + " STRIP_ABI=1\n")
+	// manifest 会静默下载并安装全部包，且其 stdout 用于校验，不能加 V=s；
+	// 改由后台心跳按 dl 目录增长情况输出下载进度（写 stderr，不污染 manifest 捕获）。
+	b.WriteString("( while sleep 5; do n=$(ls dl 2>/dev/null | wc -l); s=$(du -sk dl 2>/dev/null | cut -f1); printf '[asu] 下载中: dl 共 %s 个文件, %s KiB\\n' \"$n\" \"$s\" >&2; done ) &\nheartbeat=$!\n")
+	b.WriteString("capture .asu-manifest make manifest" + common + " STRIP_ABI=1 || { kill \"$heartbeat\" 2>/dev/null; exit 1; }\nkill \"$heartbeat\" 2>/dev/null || true\nwait \"$heartbeat\" 2>/dev/null || true\n")
 	keys := make([]string, 0, len(j.PackageVersions))
 	for k := range j.PackageVersions {
 		keys = append(keys, k)
