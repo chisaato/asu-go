@@ -1,6 +1,6 @@
 # AGENTS.md
 
-ASU-Go：用 Go 重写的 OpenWrt Attended Sysupgrade 服务端，单二进制，内置 Web 管理后台与实时构建日志。项目目前处于**设计阶段**，`docs/` 是事实来源，代码尚未开始。
+ASU-Go：用 Go 重写的 OpenWrt Attended Sysupgrade 服务端，单二进制，内置 Web 管理后台与实时构建日志。一期（见 `.scratch/README.md`）已实现并合并，`docs/` 与各包 `README.md` 是事实来源；真实 ImageBuilder 的 owut/LuCI 手工冒烟与 Docker 真机集成测试尚待人工。
 
 ## 必读文档
 
@@ -23,7 +23,7 @@ ASU-Go：用 Go 重写的 OpenWrt Attended Sysupgrade 服务端，单二进制�
 
 ## 常用命令
 
-统一通过 `Makefile`（待创建，创建后以其为准）：
+统一通过 `Makefile`：
 
 ```bash
 make dev      # Go 服务 + Nuxt dev server（代理到 Go :8000）
