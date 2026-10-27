@@ -30,6 +30,20 @@
 
 Go + Gin + Cobra + YAML 配置 + SQLite；前端 Bun + Nuxt 4 (SPA) + Nuxt UI，构建后嵌入二进制；容器运行时经 `Runtime` 接口抽象（Docker / Podman，预留 Kubernetes）。详见 [技术栈与工程约定](docs/tech-stack.md)。
 
+## 多发行版客户端配置
+
+同一实例可同时服务 OpenWrt 和 ImmortalWrt。无前缀 API 使用 `server.default_distro`（默认 `openwrt`）；`/openwrt`、`/immortalwrt` 前缀提供各自独立的元数据及完整公开 API。对应发行版须在 sources 中启用，管理后台地址仍为 `/admin`。
+
+**ImmortalWrt 固件应使用 `http://host:8000/immortalwrt`**，避免获取 OpenWrt 专属版本：
+
+```sh
+owut check --server http://host:8000/immortalwrt
+uci set attendedsysupgrade.server.url='http://host:8000/immortalwrt'
+uci commit attendedsysupgrade
+```
+
+LuCI 中将 Attended Sysupgrade 的服务器 URL 设为同一地址。仅服务 ImmortalWrt 时也可设 `server.default_distro: immortalwrt`。详见 [API 多发行版与路径前缀](docs/api-spec.md#多发行版与路径前缀)。
+
 ---
 
 ## 目录结构规划

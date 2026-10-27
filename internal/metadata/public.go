@@ -81,9 +81,8 @@ func branchInfo(name string) *BranchInfo {
 	return &BranchInfo{Path: path, Snapshot: name == "SNAPSHOT", PathPackages: "DEPRECATED", BranchOffRev: revision, PackageChanges: changes, Name: name, Versions: []string{}, Targets: map[string]any{}}
 }
 
-// 公共兼容协议没有 distribution 参数，按原版固定提供 OpenWrt 视图。
-// 发行版全量目录仍通过 /admin/api/sources 访问。
-func (s *Service) Overview(ctx context.Context) (Overview, error) {
+// Overview 仅返回指定发行版的目录，避免客户端混用其他发行版的版本。
+func (s *Service) Overview(ctx context.Context, distro string) (Overview, error) {
 	catalog, err := s.Store.List(ctx)
 	if err != nil {
 		return Overview{}, err
@@ -95,7 +94,7 @@ func (s *Service) Overview(ctx context.Context) (Overview, error) {
 	channels := map[string]string{}
 	upstreamSet := false
 	for _, source := range catalog {
-		if source.Distribution != "openwrt" {
+		if source.Distribution != distro {
 			continue
 		}
 		if !upstreamSet || source.Version == "SNAPSHOT" {
@@ -127,8 +126,8 @@ func (s *Service) Overview(ctx context.Context) (Overview, error) {
 	return result, nil
 }
 
-func (s *Service) Branches(ctx context.Context) ([]*BranchInfo, error) {
-	overview, err := s.Overview(ctx)
+func (s *Service) Branches(ctx context.Context, distro string) ([]*BranchInfo, error) {
+	overview, err := s.Overview(ctx, distro)
 	if err != nil {
 		return nil, err
 	}
@@ -151,7 +150,7 @@ type RevisionError struct {
 
 func (e *RevisionError) Error() string { return e.Detail }
 
-func (s *Service) Revision(ctx context.Context, version, target, subtarget string) (string, error) {
+func (s *Service) Revision(ctx context.Context, distro, version, target, subtarget string) (string, error) {
 	catalog, err := s.Store.List(ctx)
 	if err != nil {
 		return "", err
@@ -159,7 +158,7 @@ func (s *Service) Revision(ctx context.Context, version, target, subtarget strin
 	var selected *sources.Source
 	for i := range catalog {
 		source := &catalog[i]
-		if source.Distribution != "openwrt" || source.Branch != Branch(version) {
+		if source.Distribution != distro || !source.Enabled || source.Branch != Branch(version) {
 			continue
 		}
 		selected = source

@@ -42,6 +42,9 @@ func NewRequest() Request {
 	}
 }
 
+// DistroSpecified 区分 JSON 显式值与缺省值，供路径作用域应用默认发行版。
+func (r Request) DistroSpecified() bool { return r.distroSet }
+
 // UnmarshalJSON 保留原版的必填字段、非空类型约束与省略字段默认值。
 // 类型和模型错误属于 422；服务端策略校验属于 400。
 func (r *Request) UnmarshalJSON(data []byte) error {

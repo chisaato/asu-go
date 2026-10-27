@@ -2,6 +2,8 @@
 # 环境变量：ASU_SERVER_LISTEN、ASU_LOG_LEVEL、ASU_DATA_DIR、ASU_ADMIN_TOKEN。
 server:
   listen: ":8000"
+  # 无路径前缀时使用的发行版，必须在 sources 中启用；/immortalwrt/ 等前缀独立选择发行版。
+  default_distro: openwrt
   cors:
     # 公开 /api/、/json/、/store/：* 不携带凭据；可改为精确来源列表，[] 关闭。
     public_origins: ["*"]

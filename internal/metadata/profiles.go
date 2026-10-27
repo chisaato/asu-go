@@ -355,7 +355,7 @@ func (s *Service) archIndex(ctx context.Context, source *sources.Source, path st
 }
 
 // JSONPath 解析 /json/v1/ 后的任意多段规范路径，路由层无需模拟 FastAPI 的贪婪参数。
-func (s *Service) JSONPath(ctx context.Context, path string) (any, error) {
+func (s *Service) JSONPath(ctx context.Context, distro, path string) (any, error) {
 	if !safePath(path) {
 		return nil, &RevisionError{400, "Invalid metadata path"}
 	}
@@ -369,7 +369,7 @@ func (s *Service) JSONPath(ctx context.Context, path string) (any, error) {
 	default:
 		return nil, &RevisionError{404, "Not Found"}
 	}
-	source, err := s.source(ctx, "openwrt", version)
+	source, err := s.source(ctx, distro, version)
 	if err != nil {
 		return nil, err
 	}
@@ -384,7 +384,7 @@ func (s *Service) JSONPath(ctx context.Context, path string) (any, error) {
 	prefix := VersionPath(version) + "/targets/"
 	if strings.HasPrefix(path, prefix) && strings.HasSuffix(last, ".json") {
 		target := strings.TrimPrefix(base, prefix)
-		return s.Profile(ctx, "openwrt", version, target, strings.TrimSuffix(last, ".json"))
+		return s.Profile(ctx, distro, version, target, strings.TrimSuffix(last, ".json"))
 	}
 	return nil, &RevisionError{404, "Not Found"}
 }

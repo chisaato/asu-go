@@ -30,6 +30,26 @@ func TestYAMLTags(t *testing.T) {
 	check(reflect.TypeFor[Config]())
 }
 
+func TestDefaultDistro(t *testing.T) {
+	if Default().Server.DefaultDistro != "openwrt" {
+		t.Fatal("默认发行版必须为 openwrt")
+	}
+	for _, distro := range []string{"immortalwrt", "admin", "api", "json", "store", "healthz", "stats", "bad/name", ""} {
+		cfg, err := Decode(strings.NewReader("server:\n  default_distro: '" + distro + "'\n"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		err = cfg.Validate()
+		if distro == "immortalwrt" {
+			if err != nil {
+				t.Fatal(err)
+			}
+		} else if err == nil || !strings.Contains(err.Error(), "server.default_distro") {
+			t.Fatalf("未拒绝默认发行版 %q: %v", distro, err)
+		}
+	}
+}
+
 func TestExample(t *testing.T) {
 	f, err := os.Open("../../configs/asu.example.yaml")
 	if err != nil {

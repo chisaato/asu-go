@@ -38,6 +38,20 @@ func NewSource() Source {
 var releaseVersion = regexp.MustCompile(`^\d+\.\d+\.\d+(-rc\d+)?$`)
 var tagPattern = regexp.MustCompile(`^[\w][\w.-]{0,127}$`)
 
+var distributionPattern = regexp.MustCompile(`^[a-z][a-z0-9_-]*$`)
+
+// ValidateDistribution 保证发行版可安全用作公开 API 的首段路径。
+func ValidateDistribution(distro string) error {
+	if !distributionPattern.MatchString(distro) {
+		return fmt.Errorf("distribution %q 必须为小写路径标识", distro)
+	}
+	switch distro {
+	case "admin", "api", "json", "store", "healthz", "stats":
+		return fmt.Errorf("distribution %q 与保留路由冲突", distro)
+	}
+	return nil
+}
+
 // ResolveImage 对齐原版 asu/util.py:get_container_version_tag。
 // ImmortalWrt 标签于 2026-10-27 查证 Docker Hub API：
 // https://hub.docker.com/v2/repositories/immortalwrt/imagebuilder/tags?name=mediatek-filogic&page_size=10
@@ -58,6 +72,9 @@ func ResolveImage(source Source, target string) (string, error) {
 }
 
 func (s Source) Validate() error {
+	if err := ValidateDistribution(s.Distribution); err != nil {
+		return err
+	}
 	for name, value := range map[string]string{"distribution": s.Distribution, "branch": s.Branch, "version": s.Version, "image": s.Image, "tag_template": s.TagTemplate} {
 		if strings.TrimSpace(value) == "" {
 			return fmt.Errorf("%s 不得为空", name)

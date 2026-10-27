@@ -38,7 +38,7 @@ func HTTP(logger *zap.Logger) gin.HandlerFunc {
 				level = zapcore.ErrorLevel
 			} else if status >= 400 {
 				level = zapcore.WarnLevel
-			} else if c.Request.URL.Path == "/healthz" || strings.HasPrefix(c.Request.URL.Path, "/admin/_nuxt/") || strings.HasPrefix(c.Request.URL.Path, "/admin/favicon") {
+			} else if c.Request.URL.Path == "/healthz" || c.FullPath() == "/:distro/healthz" || strings.HasPrefix(c.Request.URL.Path, "/admin/_nuxt/") || strings.HasPrefix(c.Request.URL.Path, "/admin/favicon") {
 				level = zapcore.DebugLevel
 			}
 			fields := []zap.Field{zap.String("method", c.Request.Method), zap.String("path", c.Request.URL.Path), zap.String("route", c.FullPath()), zap.Int("status", status), zap.Float64("latency_ms", float64(time.Since(start).Microseconds())/1000), zap.String("client_ip", c.ClientIP()), zap.Int("bytes", max(c.Writer.Size(), 0)), zap.String("user_agent", c.Request.UserAgent()), zap.String("request_id", id)}

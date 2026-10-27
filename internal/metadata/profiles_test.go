@@ -144,7 +144,7 @@ func TestOpenWrtSmoke(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	index, err := s.JSONPath(ctx, "releases/24.10.1/targets/x86/64/index.json")
+	index, err := s.JSONPath(ctx, "openwrt", "releases/24.10.1/targets/x86/64/index.json")
 	if err != nil {
 		t.Fatal(err)
 	}

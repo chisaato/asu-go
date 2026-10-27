@@ -8,6 +8,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/gzzchh/asu-go/internal/config"
+	"github.com/gzzchh/asu-go/internal/sources"
 )
 
 // New 返回全局中间件；预检在路由和管理鉴权之前结束。
@@ -19,6 +20,11 @@ func New(cfg config.CORS) gin.HandlerFunc {
 			return
 		}
 		path := c.Request.URL.Path
+		// 仅剥离一个合法发行版前缀，绝不将 /admin/api 归入公开策略。
+		first, rest, _ := strings.Cut(strings.TrimPrefix(path, "/"), "/")
+		if sources.ValidateDistribution(first) == nil {
+			path = "/" + rest
+		}
 		var origins []string
 		admin := strings.HasPrefix(path, "/admin/api/")
 		switch {

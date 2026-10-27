@@ -23,6 +23,9 @@ func TestMiddleware(t *testing.T) {
 		vary        string
 	}{
 		{name: "public wildcard", cfg: config.Default().Server.CORS, path: "/api/v1/stats", origin: "https://selector.example", allow: "*"},
+		{name: "distro public", cfg: config.Default().Server.CORS, path: "/immortalwrt/api/v1/stats", origin: "https://selector.example", allow: "*"},
+		{name: "distro json", cfg: config.Default().Server.CORS, path: "/immortalwrt/json/v1/latest.json", origin: "https://selector.example", allow: "*"},
+		{name: "distro store preflight", cfg: config.Default().Server.CORS, path: "/openwrt/store/hash/image.bin", origin: "https://selector.example", preflight: true, allow: "*"},
 		{name: "json wildcard", cfg: config.Default().Server.CORS, path: "/json/v1/latest.json", origin: "https://selector.example", allow: "*"},
 		{name: "store range preflight", cfg: config.Default().Server.CORS, path: "/store/hash/image.bin", origin: "https://selector.example", preflight: true, allow: "*"},
 		{name: "public exact", cfg: config.CORS{PublicOrigins: []string{"https://selector.example"}}, path: "/api/v1/stats", origin: "https://selector.example", allow: "https://selector.example", vary: "Origin"},

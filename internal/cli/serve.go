@@ -57,6 +57,9 @@ func runServe(parent context.Context, cfg config.Config) error {
 	if err := catalog.SeedDefaults(ctx); err != nil {
 		return err
 	}
+	if err := api.ValidateCatalog(ctx, catalog, cfg.Server.DefaultDistro); err != nil {
+		return err
+	}
 	gin.SetMode(gin.ReleaseMode)
 	router := gin.New()
 	router.Use(func(c *gin.Context) {
@@ -69,7 +72,9 @@ func runServe(parent context.Context, cfg config.Config) error {
 		c.Next()
 	})
 	router.Use(httplog.HTTP(logger))
+	router.Use(api.DistroScope(catalog, cfg.Server.DefaultDistro))
 	router.Use(cors.New(cfg.Server.CORS))
+	public := []gin.IRouter{router, router.Group("/:distro")}
 	webui.Register(router)
 	adminGroup, err := admin.RegisterAuth(router, cfg.Admin, logger)
 	if err != nil {
@@ -79,7 +84,9 @@ func runServe(parent context.Context, cfg config.Config) error {
 	upstream := metadata.NewClient("asu-go/" + Version)
 	metadataCache := &metadata.Cache{Dir: cfg.DataDir, TTL: cfg.Metadata.CacheTTL, Client: upstream, Logger: logger.With(zap.String("component", "metadata-cache"))}
 	meta := &metadata.Service{Store: catalog, Client: upstream, Version: Version, Cache: metadataCache}
-	api.RegisterMetadata(router, meta)
+	for _, routes := range public {
+		api.RegisterMetadata(routes, meta)
+	}
 	hub, err := stream.NewHub(cfg.DataDir, stream.DefaultCapacity)
 	if err != nil {
 		return fmt.Errorf("日志 Hub: %w", err)
@@ -102,12 +109,19 @@ func runServe(parent context.Context, cfg config.Config) error {
 	admin.RegisterLogs(adminGroup, stream.Service{Hub: hub, Jobs: jobs})
 	artifactStore := &store.Local{Dir: cfg.StoreDir(), Logger: logger}
 	jobs.Publisher = artifactStore
-	api.RegisterStore(router, artifactStore, jobs.StoreVisible)
+	for _, routes := range public {
+		api.RegisterStore(routes, artifactStore, jobs.StoreVisible)
+	}
 	cleaner := &queue.Cleaner{Jobs: jobs, Store: artifactStore, StoreDir: cfg.StoreDir(), Interval: cfg.Cleaner.Interval, OrphanGrace: cfg.Cleaner.OrphanGrace, Logger: logger.With(zap.String("component", "cleaner"))}
 	admin.RegisterStore(adminGroup, cleaner)
 	admin.RegisterJobs(adminGroup, jobs)
-	api.RegisterBuild(router, jobs)
+	for _, routes := range public {
+		api.RegisterBuild(routes, jobs)
+	}
 	router.GET("/healthz", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{"status": "ok"})
+	})
+	router.GET("/:distro/healthz", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"status": "ok"})
 	})
 	listener, err := net.Listen("tcp", cfg.Server.Listen)

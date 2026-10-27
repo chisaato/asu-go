@@ -24,34 +24,34 @@ func metadataError(c *gin.Context, err error) {
 	c.Status(http.StatusInternalServerError)
 }
 
-func RegisterMetadata(router *gin.Engine, service *metadata.Service) {
+func RegisterMetadata(router gin.IRouter, service *metadata.Service) {
 	// Gin 不允许在同一前缀下混用静态路由和 *path；在一个入口中分派。
 	router.GET("/json/v1/*path", func(c *gin.Context) {
 		path := strings.TrimPrefix(c.Param("path"), "/")
 		switch path {
 		case "latest.json":
-			overview, err := service.Overview(c.Request.Context())
+			overview, err := service.Overview(c.Request.Context(), requestDistro(c))
 			if err != nil {
 				metadataError(c, err)
 				return
 			}
 			c.JSON(http.StatusOK, gin.H{"latest": overview.Latest})
 		case "branches.json":
-			branches, err := service.Branches(c.Request.Context())
+			branches, err := service.Branches(c.Request.Context(), requestDistro(c))
 			if err != nil {
 				metadataError(c, err)
 				return
 			}
 			c.JSON(http.StatusOK, branches)
 		case "overview.json":
-			overview, err := service.Overview(c.Request.Context())
+			overview, err := service.Overview(c.Request.Context(), requestDistro(c))
 			if err != nil {
 				metadataError(c, err)
 				return
 			}
 			c.JSON(http.StatusOK, overview)
 		default:
-			value, err := service.JSONPath(c.Request.Context(), path)
+			value, err := service.JSONPath(c.Request.Context(), requestDistro(c), path)
 			if err != nil {
 				metadataError(c, err)
 				return
@@ -60,7 +60,7 @@ func RegisterMetadata(router *gin.Engine, service *metadata.Service) {
 		}
 	})
 	router.GET("/api/v1/revision/:version/:target/:subtarget", func(c *gin.Context) {
-		revision, err := service.Revision(c.Request.Context(), c.Param("version"), c.Param("target"), c.Param("subtarget"))
+		revision, err := service.Revision(c.Request.Context(), requestDistro(c), c.Param("version"), c.Param("target"), c.Param("subtarget"))
 		if err != nil {
 			metadataError(c, err)
 			return
@@ -68,6 +68,12 @@ func RegisterMetadata(router *gin.Engine, service *metadata.Service) {
 		c.JSON(http.StatusOK, gin.H{"revision": revision})
 	})
 	for _, name := range []string{"latest", "overview"} {
-		router.GET("/api/v1/"+name, func(c *gin.Context) { c.Redirect(http.StatusMovedPermanently, "/json/v1/"+name+".json") })
+		router.GET("/api/v1/"+name, func(c *gin.Context) {
+			prefix := ""
+			if distro := c.Param("distro"); distro != "" {
+				prefix = "/" + distro
+			}
+			c.Redirect(http.StatusMovedPermanently, prefix+"/json/v1/"+name+".json")
+		})
 	}
 }

@@ -13,6 +13,7 @@ import (
 
 	"github.com/gzzchh/asu-go/internal/queue"
 	"github.com/gzzchh/asu-go/internal/runtime"
+	"github.com/gzzchh/asu-go/internal/sources"
 	"github.com/gzzchh/asu-go/internal/stats"
 	"github.com/gzzchh/asu-go/internal/store"
 	"go.uber.org/zap/zapcore"
@@ -36,8 +37,9 @@ type Config struct {
 }
 
 type Server struct {
-	Listen string `yaml:"listen"`
-	CORS   CORS   `yaml:"cors"`
+	DefaultDistro string `yaml:"default_distro"`
+	Listen        string `yaml:"listen"`
+	CORS          CORS   `yaml:"cors"`
 }
 
 type CORS struct {
@@ -126,7 +128,7 @@ type Diagnostics struct {
 
 func Default() Config {
 	return Config{
-		Server:      Server{Listen: ":8000", CORS: CORS{PublicOrigins: []string{"*"}, AdminOrigins: []string{}}},
+		Server:      Server{Listen: ":8000", DefaultDistro: "openwrt", CORS: CORS{PublicOrigins: []string{"*"}, AdminOrigins: []string{}}},
 		Log:         Log{Format: "json", Level: "info"},
 		DataDir:     "data",
 		Admin:       Admin{SessionTTL: 24 * time.Hour},
@@ -211,6 +213,9 @@ func Load(path string, flags Overrides) (Config, error) {
 }
 
 func (c Config) Validate() error {
+	if err := sources.ValidateDistribution(c.Server.DefaultDistro); err != nil {
+		return fmt.Errorf("server.default_distro: %w", err)
+	}
 	for _, origin := range c.Server.CORS.AdminOrigins {
 		if strings.Contains(origin, "*") {
 			return errors.New("server.cors.admin_origins: 不允许通配符，必须为精确来源")

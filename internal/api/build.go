@@ -3,6 +3,7 @@ package api
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"strconv"
@@ -13,7 +14,7 @@ import (
 	"github.com/gzzchh/asu-go/internal/queue"
 )
 
-func RegisterBuild(router *gin.Engine, q *queue.SQLite) {
+func RegisterBuild(router gin.IRouter, q *queue.SQLite) {
 	write := func(c *gin.Context, response queue.Response, err error) {
 		if err != nil {
 			_ = c.Error(err)
@@ -54,6 +55,12 @@ func RegisterBuild(router *gin.Engine, q *queue.SQLite) {
 		var extra any
 		if err := decoder.Decode(&extra); err != io.EOF {
 			write(c, queue.ValidationResponse(&buildreq.ValidationError{Status: 422, Field: "request", Detail: "Invalid JSON document"}), nil)
+			return
+		}
+		if !request.DistroSpecified() {
+			request.Distro = requestDistro(c)
+		} else if prefix := c.Param("distro"); prefix != "" && request.Distro != prefix {
+			c.JSON(http.StatusBadRequest, gin.H{"status": 400, "detail": fmt.Sprintf("Unsupported distro: %s (path prefix %s does not match body distro)", request.Distro, prefix)})
 			return
 		}
 		response, err := q.Submit(c.Request.Context(), request, c.GetHeader("User-Agent"))

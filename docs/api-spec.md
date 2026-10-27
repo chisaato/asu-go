@@ -8,7 +8,29 @@
 
 ## 1. 客户端兼容 API (OpenWrt Standard)
 
+### 多发行版与路径前缀
+
+原版 ASU 是单发行版实例。ASU-Go 可同时启用多个发行版，公开 API 同时挂载于 `/` 与 `/{distro}/`：例如 `/openwrt/json/v1/latest.json`、`/immortalwrt/json/v1/latest.json`、`/immortalwrt/api/v1/build`、`/immortalwrt/store/{request_hash}/{file_name}`。
+
+- 无前缀路径使用 `server.default_distro`，默认 `openwrt`；启动时必须存在该发行版的已启用 source，运行中禁用全部对应 source 后无前缀接口返回带清晰原因的 503。
+- 前缀来自 sources 表中的已启用 `distribution`，未知或全部禁用的发行版返回 404（包括预检）。发行版标识仅允许小写字母开头及小写字母、数字、`_`、`-`；`admin`、`api`、`json`、`store`、`healthz`、`stats` 为保留词，创建/导入及启动校验会拒绝。
+- latest、overview、branches、revision 和所有 `/json/v1/*` 仅使用选定发行版的数据，不跨发行版合并；`/api/v1/latest|overview` 的重定向保留前缀。
+- POST build 省略 `distro` 时使用路径发行版或默认发行版；带前缀且显式 `distro` 不一致时返回 400，`detail` 为 `Unsupported distro: ... (path prefix ... does not match body distro)`。无前缀请求仍可显式选择任一启用发行版。显式空值/null 的校验语义不变；请求哈希仍包含 distro，算法不变。
+- `bin_dir` 仍为请求 hash、`images[].name` 仍为文件名。owut 使用 `server_url + "/store/" + bin_dir + "/" + image.name`，LuCI 使用同样的拼接；因此保留服务器 URL 的路径前缀即可下载。带前缀与无前缀 `/store/` 指向同一 hash 存储，不做发行版过滤；统计仍为全局。`/admin` 与 `/admin/api` 不镜像、不受影响。
+
+**ImmortalWrt 固件应指向 `/immortalwrt`，不能使用仍默认 OpenWrt 的根 URL。** 客户端示例：
+
+```sh
+owut check --server http://host:8000/immortalwrt
+uci set attendedsysupgrade.server.url='http://host:8000/immortalwrt'
+uci commit attendedsysupgrade
+```
+
+LuCI 的 Attended Sysupgrade 页面服务器地址也设为 `http://host:8000/immortalwrt`。若实例只服务 ImmortalWrt，可设置 `server.default_distro: immortalwrt`，让无前缀客户端也使用该发行版；多发行版实例推荐始终显式配置路径前缀。
+
 ### 跨域访问（CORS）
+
+下述公开 CORS 策略同样覆盖 `/{distro}/api/`、`/{distro}/json/`、`/{distro}/store/`，不把管理接口作为公开接口处理。
 
 公开 `/api/`、`/json/`、`/store/` 默认返回 `Access-Control-Allow-Origin: *`（不携带凭据），支持 GET、HEAD、POST、OPTIONS，以及 Content-Type、Range、If-Modified-Since、If-None-Match 请求头。浏览器可读取 `X-Imagebuilder-Status`、`X-Queue-Position`、Content-Length、Content-Range、ETag、Last-Modified；预检直接返回 204，缓存 86400 秒。`server.cors.public_origins` 可限制精确来源（回写 Origin 并添加 `Vary: Origin`），或设为 `[]` 关闭；无 Origin 或来源不匹配时不添加 CORS 头。`/admin/api/` 默认仅同源，须在 `server.cors.admin_origins` 配置精确来源（禁止 `*`）才允许携带凭据及 Content-Type、Authorization、X-Requested-With 请求头，预检不经过鉴权；`/admin` 静态页面不受影响。
 

@@ -2,6 +2,8 @@
 # 完整字段说明见 configs/asu.example.yaml。
 server:
   listen: ":8000"
+  # 无前缀的公开 API 默认发行版；ImmortalWrt 客户端请使用 /immortalwrt。
+  default_distro: openwrt
   cors:
     # 公开 API 与产物默认允许任意来源（无凭据）；精确列表限制来源，[] 关闭。
     public_origins: ["*"]

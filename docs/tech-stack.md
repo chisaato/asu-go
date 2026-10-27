@@ -149,6 +149,8 @@ K8S 预留要点（现在就遵守，避免日后返工）：
 
 ### 4.2 发行版 / source 目录
 
+公开兼容 API 使用发行版路径前缀镜像：`/{distro}/api/`、`/{distro}/json/`、`/{distro}/store/`；无前缀使用 `server.default_distro`（默认 `openwrt`，启动时校验已启用）。元数据服务显式接收 distro；Gin 以独立 `/:distro` 路由组镜像公开接口，逐请求校验启用状态，在 CORS 之前拒绝未知前缀。`admin/api/json/store/healthz/stats` 不可作发行版标识；管理 API 不镜像。公开 CORS 同时覆盖前缀路径。客户端配置见 [api-spec.md](api-spec.md#多发行版与路径前缀)。
+
 运行时以 SQLite 为唯一事实来源，内嵌默认目录（OpenWrt、ImmortalWrt）首次启动写入；上游同步新增版本，不覆盖被本地修改的字段；YAML 仅用于 `asu source export/import`。source 的核心字段：`distribution`、`version`、`upstream_url`、`image`（镜像基名）、`tag_template`、`package_manager`、`origin`（`upstream`/`local`）、`rolling`、`enabled`。一期镜像只认容器镜像，ImageBuilder 压缩包自建镜像不做。
 
 ### 4.3 元数据同步

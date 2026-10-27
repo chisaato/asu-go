@@ -25,6 +25,8 @@ func TestHTTPLogging(t *testing.T) {
 		{"/jobs/abc", 400, zapcore.WarnLevel},
 		{"/jobs/abc", 500, zapcore.ErrorLevel},
 		{"/healthz", 200, zapcore.DebugLevel},
+		{"/immortalwrt/healthz", 200, zapcore.DebugLevel},
+		{"/immortalwrt/healthz", 404, zapcore.WarnLevel},
 		{"/admin/_nuxt/app.js", 200, zapcore.DebugLevel},
 	} {
 		t.Run(tc.path+http.StatusText(tc.status), func(t *testing.T) {
@@ -38,6 +40,7 @@ func TestHTTPLogging(t *testing.T) {
 				c.Status(tc.status)
 			})
 			r.GET("/healthz", func(c *gin.Context) { c.Status(tc.status) })
+			r.GET("/:distro/healthz", func(c *gin.Context) { c.Status(tc.status) })
 			r.GET("/admin/_nuxt/*asset", func(c *gin.Context) { c.Status(tc.status) })
 			req := httptest.NewRequest(http.MethodGet, tc.path+"?token=secret-query&password=secret-password", nil)
 			req.Header.Set("X-Request-Id", "trace-123")
@@ -57,6 +60,9 @@ func TestHTTPLogging(t *testing.T) {
 				t.Fatal(fields)
 			}
 			if strings.Contains(tc.path, "/jobs/") && fields["route"] != "/jobs/:id" {
+				t.Fatal(fields)
+			}
+			if strings.HasPrefix(tc.path, "/immortalwrt/") && fields["route"] != "/:distro/healthz" {
 				t.Fatal(fields)
 			}
 			for _, f := range entries[0].Context {

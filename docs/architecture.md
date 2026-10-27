@@ -112,12 +112,14 @@ SQLite 文件只由 `asu serve` 进程打开。CLI 的管理命令（`asu source
   通过 Go 广播 channel 实现一写多读，前端 Web 控制台通过 SSE（Server-Sent Events）建立单向持久连接，无需轮询即可毫秒级渲染最新终端行。
 
 ### 3.4 元数据引擎 (`internal/metadata`)
+- 公开路由同时提供 `/`（`server.default_distro`，默认 OpenWrt）与 `/{distro}/` 镜像；逐请求从 sources 检查发行版是否启用，所有元数据查询显式传递 distro 并隔离版本视图。管理路由不镜像，保留词禁止用于发行版前缀。
 - 维护 OpenWrt / ImmortalWrt 的版本树缓存：
   - 定期拉取 `.versions.json`、`.targets.json`。
   - 按需惰性拉取并解析指定 Target 的 `profiles.json` 与 `Packages` 索引清单。
   - 处理包管理器差异（APK vs OPKG）及内核拆分逻辑（如 24.10+ 的 kmod 分离特性）。
 
 ### 3.5 产物存储与发布层 (`internal/store`)
+- `/{distro}/store/{request_hash}/` 是同一存储的路径镜像，保持客户端按服务器 URL 拼接下载地址可用；hash 本身已包含 distro，不额外分区。统计同样保持全局。
 - 固件统一存放在 `/store/{request_hash}/` 下。
 - 提供本地存储（带文件安全边界检查）和 S3 存储两种实现。
 - 提供过期清理策略引擎（TTL Cleaner）：按照 `build_ttl`（如 7 天）、`build_defaults_ttl` 定期回收过期固件和日志。

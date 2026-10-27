@@ -141,6 +141,71 @@ func (h *buildHarness) start() {
 	h.done = make(chan error, 1)
 	go func() { h.done <- h.q.Run(ctx) }()
 }
+
+func TestBuildDistroScope(t *testing.T) {
+	h := newBuildHarness(t)
+	ctx := context.Background()
+	catalog := sources.NewStore(h.db)
+	all, err := catalog.List(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	immortal := all[0]
+	immortal.Distribution = "immortalwrt"
+	if _, err := catalog.Create(ctx, immortal); err != nil {
+		t.Fatal(err)
+	}
+	// 根路径默认 ImmortalWrt，证明不是硬编码的 OpenWrt。
+	h.router = gin.New()
+	h.router.Use(DistroScope(catalog, "immortalwrt"))
+	for _, routes := range []gin.IRouter{h.router, h.router.Group("/:distro")} {
+		RegisterBuild(routes, h.q)
+	}
+	body := `"version":"24.10.0","target":"x86/64","profile":"generic"`
+	hashes := map[string]string{}
+	for _, tc := range []struct{ path, extra, distro string }{
+		{"", "", "immortalwrt"},
+		{"/immortalwrt", "", "immortalwrt"},
+		{"/immortalwrt", `,"distro":"immortalwrt"`, "immortalwrt"},
+		{"/openwrt", "", "openwrt"},
+		{"", `,"distro":"openwrt"`, "openwrt"},
+	} {
+		w, response := h.call("POST", tc.path+"/api/v1/build", "{"+body+tc.extra+"}")
+		if w.Code != 202 {
+			t.Fatalf("%s %s: %d %s", tc.path, tc.extra, w.Code, w.Body)
+		}
+		hash, _ := response["request_hash"].(string)
+		var raw string
+		if err := h.db.QueryRowContext(ctx, "SELECT request FROM jobs WHERE request_hash=?", hash).Scan(&raw); err != nil {
+			t.Fatal(err)
+		}
+		var request buildreq.Request
+		if err := json.Unmarshal([]byte(raw), &request); err != nil || request.Distro != tc.distro {
+			t.Fatalf("实际 distro=%s, 期望 %s: %v", request.Distro, tc.distro, err)
+		}
+		if previous := hashes[tc.distro]; previous != "" && previous != hash {
+			t.Fatal("路径前缀改变了相同请求的 hash")
+		}
+		hashes[tc.distro] = hash
+		for _, method := range []string{"GET", "HEAD"} {
+			w, _ := h.call(method, tc.path+"/api/v1/build/"+hash, "")
+			if w.Code != 202 {
+				t.Fatalf("%s 轮询失败: %d", method, w.Code)
+			}
+		}
+		w, _ = h.call("GET", tc.path+"/api/v1/stats", "")
+		if w.Code != 200 {
+			t.Fatal(w.Body)
+		}
+	}
+	if hashes["openwrt"] == hashes["immortalwrt"] {
+		t.Fatal("hash 未区分 distro")
+	}
+	w, _ := h.call("POST", "/immortalwrt/api/v1/build", "{"+body+`,"distro":"openwrt"}`)
+	if w.Code != 400 || !strings.Contains(w.Body.String(), "Unsupported distro: openwrt") || !strings.Contains(w.Body.String(), "path prefix immortalwrt") {
+		t.Fatalf("未拒绝前缀冲突: %d %s", w.Code, w.Body)
+	}
+}
 func (h *buildHarness) call(method, path, body string) (*httptest.ResponseRecorder, map[string]any) {
 	h.t.Helper()
 	req := httptest.NewRequest(method, path, strings.NewReader(body))

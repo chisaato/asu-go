@@ -11,7 +11,7 @@ import (
 )
 
 // RegisterStore 提供匿名下载，按原版 FileResponse 强制二进制附件类型。
-func RegisterStore(router *gin.Engine, backend store.Store, visible ...func(context.Context, string) (bool, error)) {
+func RegisterStore(router gin.IRouter, backend store.Store, visible ...func(context.Context, string) (bool, error)) {
 	handler := func(c *gin.Context) {
 		hash, name, _ := strings.Cut(strings.TrimPrefix(c.Param("path"), "/"), "/")
 		if len(visible) > 0 {
