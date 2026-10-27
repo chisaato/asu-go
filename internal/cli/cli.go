@@ -69,7 +69,7 @@ func NewCommand() *cobra.Command {
 			return database.Migrate(cmd.Context())
 		},
 	})
-	root.AddCommand(newAdminCommand(), newSourceCommand(load, &server, &token), newReplayCommand(load, &server, &token), serve, configCmd, dbCmd, &cobra.Command{Use: "version", Short: "打印版本", Args: cobra.NoArgs,
+	root.AddCommand(newAdminCommand(&path), newSourceCommand(load, &server, &token), newReplayCommand(load, &server, &token), serve, configCmd, dbCmd, &cobra.Command{Use: "version", Short: "打印版本", Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			_, err := fmt.Fprintln(cmd.OutOrStdout(), Version)
 			return err

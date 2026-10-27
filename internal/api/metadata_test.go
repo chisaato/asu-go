@@ -114,7 +114,7 @@ func TestMetadataSyncAndCompatibility(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(list) != 5 {
+	if len(list) != 3 {
 		t.Fatalf("版本过滤/去重错误: %+v", list)
 	}
 	for _, source := range list {
@@ -143,7 +143,7 @@ func TestMetadataSyncAndCompatibility(t *testing.T) {
 	if err := syncer.Sync(ctx); err != nil {
 		t.Fatal(err)
 	}
-	if conditional.Load() < 5 {
+	if conditional.Load() < 3 {
 		t.Fatalf("未使用条件请求: %d", conditional.Load())
 	}
 	before, _ := json.Marshal(mustList(t, store))
@@ -168,11 +168,11 @@ func TestMetadataSyncAndCompatibility(t *testing.T) {
 		}
 		return w.Body.Bytes()
 	}
-	equalJSON(t, get("/json/v1/latest.json", 200), `{"latest":["24.10.3-rc1","24.10.2","24.10.1"]}`)
+	equalJSON(t, get("/json/v1/latest.json", 200), `{"latest":["24.10.2","24.10.1"]}`)
 	// 下列字段逐项抄录自原版 config.release/main.generate_branches，而非用待测结构生成。
-	branch := `{"path":"releases/{version}","enabled":true,"snapshot":false,"path_packages":"DEPRECATED","branch_off_rev":27990,"package_changes":[{"source":"firewall","target":"firewall4","revision":18611},{"source":"kmod-nft-nat6","revision":20282,"mandatory":true},{"source":"libustream-wolfssl","target":"libustream-mbedtls","revision":21994},{"source":"px5g-wolfssl","target":"px5g-mbedtls","revision":21994},{"source":"wpad-basic-wolfssl","target":"wpad-basic-mbedtls","revision":21994},{"source":"luci-app-diag-core","revision":25984,"mandatory":true},{"source":"auc","target":"owut","revision":26792},{"source":"luci-app-opkg","target":"luci-app-package-manager","revision":27897}],"name":"24.10","versions":["24.10.9","24.10.3-rc1","24.10.2","24.10.1","24.10-SNAPSHOT"],"targets":{"local":"keep"}}`
+	branch := `{"path":"releases/{version}","enabled":true,"snapshot":false,"path_packages":"DEPRECATED","branch_off_rev":27990,"package_changes":[{"source":"firewall","target":"firewall4","revision":18611},{"source":"kmod-nft-nat6","revision":20282,"mandatory":true},{"source":"libustream-wolfssl","target":"libustream-mbedtls","revision":21994},{"source":"px5g-wolfssl","target":"px5g-mbedtls","revision":21994},{"source":"wpad-basic-wolfssl","target":"wpad-basic-mbedtls","revision":21994},{"source":"luci-app-diag-core","revision":25984,"mandatory":true},{"source":"auc","target":"owut","revision":26792},{"source":"luci-app-opkg","target":"luci-app-package-manager","revision":27897}],"name":"24.10","versions":["24.10.9","24.10.2","24.10.1"],"targets":{"local":"keep"}}`
 	equalJSON(t, get("/json/v1/branches.json", 200), "["+branch+"]")
-	equalJSON(t, get("/json/v1/overview.json", 200), `{"latest":["24.10.3-rc1","24.10.2","24.10.1"],"branches":{"24.10":`+branch+`},"upstream_url":"`+upstream.URL+`","server":{"version":"test","contact":"mail@aparcar.org","allow_defaults":false,"repository_allow_list":[],"max_custom_rootfs_size_mb":1024,"max_defaults_length":20480}}`)
+	equalJSON(t, get("/json/v1/overview.json", 200), `{"latest":["24.10.2","24.10.1"],"branches":{"24.10":`+branch+`},"upstream_url":"`+upstream.URL+`","server":{"version":"test","contact":"mail@aparcar.org","allow_defaults":false,"repository_allow_list":[],"max_custom_rootfs_size_mb":1024,"max_defaults_length":20480}}`)
 	equalJSON(t, get("/api/v1/revision/24.10.2/ath79/generic", 200), `{"revision":"r27990-abc"}`)
 	equalJSON(t, get("/api/v1/revision/24.10.99/ath79/generic", 200), `{"revision":"r27990-abc"}`)
 	equalJSON(t, get("/api/v1/revision/99.99.0/ath79/generic", 400), `{"detail":"Unsupported version: 99.99.0","status":400}`)

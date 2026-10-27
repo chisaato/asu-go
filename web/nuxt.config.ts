@@ -4,7 +4,7 @@ export default defineNuxtConfig({
   compatibilityDate: '2026-10-27',
   ssr: false,
   app: {
-    baseURL: '/admin/',
+    baseURL: '/ui/',
     head: { title: 'ASU-Go 管理后台', htmlAttrs: { lang: 'zh-CN' } }
   },
   modules: ['@nuxt/ui', '@nuxt/eslint'],

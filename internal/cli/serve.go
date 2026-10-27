@@ -57,6 +57,7 @@ func runServe(parent context.Context, cfg config.Config) error {
 	if err := catalog.SeedDefaults(ctx); err != nil {
 		return err
 	}
+	_ = catalog.PruneObsolete(ctx)
 	if err := api.ValidateCatalog(ctx, catalog, cfg.Server.DefaultDistro); err != nil {
 		return err
 	}
@@ -106,7 +107,11 @@ func runServe(parent context.Context, cfg config.Config) error {
 		BuildTTL: cfg.Queue.BuildTTL, BuildUnversionedTTL: cfg.Queue.BuildUnversionedTTL, BuildDefaultsTTL: cfg.Queue.BuildDefaultsTTL, BuildFailureTTL: cfg.Queue.BuildFailureTTL, Retention: cfg.Diagnostics.Retention,
 		Limits: buildreq.Limits{AllowDefaults: cfg.Build.AllowDefaults, MaxDefaultsLength: cfg.Build.MaxDefaultsLength, MaxCustomRootfsSizeMB: cfg.Build.MaxCustomRootfsSizeMB, RepositoryAllowList: cfg.Build.RepositoryAllowList},
 	})
-	admin.RegisterLogs(adminGroup, stream.Service{Hub: hub, Jobs: jobs})
+	logService := stream.Service{Hub: hub, Jobs: jobs}
+	admin.RegisterLogs(adminGroup, logService)
+	admin.RegisterEvents(adminGroup, jobs, rt, &cfg, logService)
+	admin.RegisterOverview(adminGroup, jobs, rt, &cfg)
+	admin.RegisterSettings(adminGroup, &cfg, rt)
 	artifactStore := &store.Local{Dir: cfg.StoreDir(), Logger: logger}
 	jobs.Publisher = artifactStore
 	for _, routes := range public {

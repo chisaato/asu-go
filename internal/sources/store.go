@@ -241,3 +241,18 @@ func (s *Store) Delete(ctx context.Context, id int64) error {
 	}
 	return err
 }
+
+// PruneObsolete 清理不符合当前保留规则的 upstream 来源（删除 SNAPSHOT、-rc 以及非 24/25 的旧版本）。
+func (s *Store) PruneObsolete(ctx context.Context) error {
+	_, err := s.db.ExecContext(ctx, `
+		DELETE FROM sources 
+		WHERE origin = 'upstream' 
+		  AND (
+			version LIKE '%SNAPSHOT%' 
+			OR version LIKE '%-rc%' 
+			OR (version NOT LIKE '24.%' AND version NOT LIKE '25.%')
+		  )
+	`)
+	return err
+}
+

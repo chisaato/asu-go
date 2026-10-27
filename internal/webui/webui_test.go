@@ -22,6 +22,11 @@ func TestRegister(t *testing.T) {
 		status int
 		body   string
 	}{
+		{"/ui", 200, "<html>Nuxt index</html>"},
+		{"/ui/", 200, "<html>Nuxt index</html>"},
+		{"/ui/login", 200, "<html>Nuxt index</html>"},
+		{"/ui/tasks/deep/path", 200, "<html>Nuxt index</html>"},
+		{"/ui/_nuxt/app.js", 200, "console.log('asset')"},
 		{"/admin", 200, "<html>Nuxt index</html>"},
 		{"/admin/", 200, "<html>Nuxt index</html>"},
 		{"/admin/login", 200, "<html>Nuxt index</html>"},
@@ -46,7 +51,7 @@ func TestRegisterWithoutGenerate(t *testing.T) {
 	r := gin.New()
 	register(r, fstest.MapFS{"placeholder.html": {Data: []byte("请执行 make web")}})
 	w := httptest.NewRecorder()
-	r.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/admin/", nil))
+	r.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/ui/", nil))
 	if w.Code != http.StatusOK || w.Body.String() != "请执行 make web" {
 		t.Fatalf("placeholder: %d %q", w.Code, w.Body.String())
 	}

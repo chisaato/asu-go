@@ -46,6 +46,35 @@ func SortVersions(v []string) {
 	})
 }
 
+// FilterAllowedVersions 精简版本列表：
+// 1. 仅保留 24.x 和 25.x 两个大版本；
+// 2. 彻底剔除 SNAPSHOT 与 -rc 测试版本；
+// 3. 对每个分支（如 24.10、25.12）按版本降序排序，仅保留最新的 3 个正式版本。
+func FilterAllowedVersions(list []string) []string {
+	grouped := make(map[string][]string)
+	for _, v := range list {
+		if v == "" || strings.Contains(v, "SNAPSHOT") || strings.Contains(v, "-rc") {
+			continue
+		}
+		if !strings.HasPrefix(v, "24.") && !strings.HasPrefix(v, "25.") {
+			continue
+		}
+		b := Branch(v)
+		grouped[b] = append(grouped[b], v)
+	}
+
+	var result []string
+	for _, vers := range grouped {
+		SortVersions(vers)
+		if len(vers) > 3 {
+			vers = vers[:3]
+		}
+		result = append(result, vers...)
+	}
+	SortVersions(result)
+	return result
+}
+
 type Syncer struct {
 	Store  *sources.Store
 	Client *Client
@@ -82,6 +111,9 @@ func (s *Syncer) read(ctx context.Context, url string, value any) error {
 }
 
 func (s *Syncer) Sync(ctx context.Context) error {
+	// 同步前自动清理旧版本与快照
+	_ = s.Store.PruneObsolete(ctx)
+
 	catalog, err := s.Store.List(ctx)
 	if err != nil {
 		return err
@@ -97,8 +129,8 @@ func (s *Syncer) Sync(ctx context.Context) error {
 		if source.Origin == "upstream" {
 			branchKey := source.Distribution + "\n" + Branch(source.Version)
 			before, exists := primary[branchKey]
-			// 每个发行版/分支只从一个上游发现新版本：优先分支快照，否则最新版本。
-			if source.Enabled && (!exists || strings.HasSuffix(source.Version, "SNAPSHOT") || (!strings.HasSuffix(before.Version, "SNAPSHOT") && source.Version > before.Version)) {
+			// 每个发行版/分支只从一个上游发现新版本：优先最新版本。
+			if source.Enabled && (!exists || source.Version > before.Version) {
 				primary[branchKey] = source
 			}
 			key := source.Distribution + "\n" + strings.TrimRight(source.UpstreamURL, "/")
@@ -125,11 +157,11 @@ func (s *Syncer) Sync(ctx context.Context) error {
 				branches[Branch(source.Version)] = source
 			}
 		}
-		candidates := append([]string{versions.Upcoming}, versions.List...)
-		candidates = append(candidates, "SNAPSHOT")
-		for branch := range branches {
-			if branch != "SNAPSHOT" {
-				candidates = append(candidates, branch+"-SNAPSHOT")
+		rawList := append([]string{versions.Upcoming}, versions.List...)
+		candidates := FilterAllowedVersions(rawList)
+		for _, source := range group {
+			if source.Enabled && source.Version != "" && !strings.Contains(source.Version, "SNAPSHOT") {
+				candidates = append(candidates, source.Version)
 			}
 		}
 		seen := map[string]bool{}

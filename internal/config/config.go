@@ -165,6 +165,22 @@ func Decode(r io.Reader) (Config, error) {
 	return cfg, nil
 }
 
+// FindConfigFile 返回找到的有效配置文件路径，未找到时返回错误。
+func FindConfigFile(path string) (string, error) {
+	paths := []string{"asu.yaml", "asu.yml", "/etc/asu/asu.yaml", "/etc/asu/asu.yml"}
+	if path != "" {
+		paths = []string{path}
+	}
+	for _, candidate := range paths {
+		if _, err := os.Stat(candidate); err == nil {
+			return candidate, nil
+		} else if path != "" {
+			return "", fmt.Errorf("配置文件不存在: %s", path)
+		}
+	}
+	return "", errors.New("未找到配置文件 (查找了 ./asu.yaml, ./asu.yml, /etc/asu/asu.yaml, /etc/asu/asu.yml)")
+}
+
 // Load 显式指定的文件必须存在；否则依次查找当前目录和系统配置。
 func Load(path string, flags Overrides) (Config, error) {
 	cfg := Default()

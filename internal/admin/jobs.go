@@ -78,14 +78,21 @@ func RegisterJobs(group *gin.RouterGroup, jobs *queue.SQLite) {
 	group.GET("/jobs", func(c *gin.Context) {
 		page, errPage := strconv.Atoi(c.DefaultQuery("page", "1"))
 		size, errSize := strconv.Atoi(c.DefaultQuery("page_size", "20"))
-		status := c.Query("status")
-		if errPage != nil || errSize != nil || page < 1 || size < 1 || size > 200 || (status != "" && status != "all" && status != "queued" && status != "running" && status != "done" && status != "failed" && status != "finished") {
+		if errPage != nil || errSize != nil || page < 1 || size < 1 || size > 200 {
 			c.JSON(400, gin.H{"error": "invalid status or pagination"})
 			return
 		}
-		list, err := jobs.Jobs(c.Request.Context(), status, page, size)
+		filter := queue.JobFilter{
+			Status:  c.Query("status"),
+			Distro:  c.Query("distro"),
+			Version: c.Query("version"),
+			Query:   c.Query("q"),
+			Page:    page,
+			Size:    size,
+		}
+		list, err := jobs.JobsWithFilter(c.Request.Context(), filter)
 		if err != nil {
-			c.JSON(500, gin.H{"error": "internal error"})
+			c.JSON(400, gin.H{"error": "invalid status or pagination"})
 			return
 		}
 		c.JSON(200, list)

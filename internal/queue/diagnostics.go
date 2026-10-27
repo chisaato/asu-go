@@ -231,15 +231,38 @@ type JobDetail struct {
 	FinishedAt *time.Time      `json:"finished_at"`
 	ExpiresAt  *time.Time      `json:"expires_at"`
 	PurgeAt    *time.Time      `json:"purge_at"`
+	Client     string          `json:"client,omitempty"`
+	Handle     string          `json:"handle,omitempty"`
+	QueuedMs   *int64          `json:"queued_ms,omitempty"`
+	DurationMs *int64          `json:"duration_ms,omitempty"`
 }
 
-const jobColumns = `request_hash,replay_of,version,target,profile,status,COALESCE(stage,'init'),COALESCE(detail,''),COALESCE(error,''),request,COALESCE(result,'null'),COALESCE(stages,'[]'),COALESCE(options,'{}'),enqueued_at,started_at,finished_at,expires_at,purge_at`
+const jobColumns = `request_hash,replay_of,version,target,profile,status,COALESCE(stage,'init'),COALESCE(detail,''),COALESCE(error,''),request,COALESCE(result,'null'),COALESCE(stages,'[]'),COALESCE(options,'{}'),enqueued_at,started_at,finished_at,expires_at,purge_at,COALESCE(client,''),COALESCE(handle,'null')`
 
 func scanJob(row interface{ Scan(...any) error }) (JobDetail, error) {
 	var j JobDetail
-	var request, result, stages, options string
-	err := row.Scan(&j.ID, &j.ReplayOf, &j.Version, &j.Target, &j.Profile, &j.Status, &j.Stage, &j.Detail, &j.Error, &request, &result, &stages, &options, &j.EnqueuedAt, &j.StartedAt, &j.FinishedAt, &j.ExpiresAt, &j.PurgeAt)
+	var request, result, stages, options, handle string
+	err := row.Scan(&j.ID, &j.ReplayOf, &j.Version, &j.Target, &j.Profile, &j.Status, &j.Stage, &j.Detail, &j.Error, &request, &result, &stages, &options, &j.EnqueuedAt, &j.StartedAt, &j.FinishedAt, &j.ExpiresAt, &j.PurgeAt, &j.Client, &handle)
 	j.Request, j.Result, j.Stages, j.Options = json.RawMessage(request), json.RawMessage(result), json.RawMessage(stages), json.RawMessage(options)
+	if handle != "null" && handle != "" {
+		j.Handle = handle
+	}
+	if j.StartedAt != nil {
+		qms := j.StartedAt.Sub(j.EnqueuedAt).Milliseconds()
+		if qms >= 0 {
+			j.QueuedMs = &qms
+		}
+	}
+	if j.StartedAt != nil {
+		endTime := time.Now().UTC()
+		if j.FinishedAt != nil {
+			endTime = *j.FinishedAt
+		}
+		dms := endTime.Sub(*j.StartedAt).Milliseconds()
+		if dms >= 0 {
+			j.DurationMs = &dms
+		}
+	}
 	return j, err
 }
 
@@ -258,23 +281,75 @@ type JobList struct {
 	Items []JobDetail `json:"items"`
 }
 
+type JobFilter struct {
+	Status  string
+	Distro  string
+	Version string
+	Query   string
+	Page    int
+	Size    int
+}
+
 func (q *SQLite) Jobs(ctx context.Context, status string, page, size int) (JobList, error) {
+	return q.JobsWithFilter(ctx, JobFilter{Status: status, Page: page, Size: size})
+}
+
+func (q *SQLite) JobsWithFilter(ctx context.Context, filter JobFilter) (JobList, error) {
 	list := JobList{Items: []JobDetail{}}
-	where := ` WHERE (purge_at IS NULL OR purge_at>?)`
-	args := []any{time.Now().UTC()}
-	switch status {
-	case "", "all":
-	case "queued", "running", "done", "failed":
-		where += ` AND status=?`
-		args = append(args, status)
-	case "finished":
-		where += ` AND status IN ('done','failed')`
-	default:
-		return list, fmt.Errorf("invalid status")
-	}
+	page, size := filter.Page, filter.Size
 	if page < 1 || size < 1 || size > 200 {
 		return list, fmt.Errorf("invalid pagination")
 	}
+
+	where := ` WHERE (purge_at IS NULL OR purge_at>?)`
+	args := []any{time.Now().UTC()}
+
+	status := strings.TrimSpace(filter.Status)
+	if status != "" && status != "all" {
+		if strings.Contains(status, ",") {
+			parts := strings.Split(status, ",")
+			validStatuses := map[string]bool{
+				"queued": true, "running": true, "done": true, "failed": true, "timeout": true, "cancelled": true,
+			}
+			var inPlaceholders []string
+			for _, part := range parts {
+				p := strings.TrimSpace(part)
+				if !validStatuses[p] {
+					return list, fmt.Errorf("invalid status")
+				}
+				inPlaceholders = append(inPlaceholders, "?")
+				args = append(args, p)
+			}
+			where += ` AND status IN (` + strings.Join(inPlaceholders, ",") + `)`
+		} else {
+			switch status {
+			case "queued", "running", "done", "failed", "timeout", "cancelled":
+				where += ` AND status=?`
+				args = append(args, status)
+			case "finished":
+				where += ` AND status IN ('done','failed','timeout','cancelled')`
+			default:
+				return list, fmt.Errorf("invalid status")
+			}
+		}
+	}
+
+	if filter.Distro != "" {
+		where += ` AND (json_extract(request, '$.distro') = ? OR (? = 'openwrt' AND json_extract(request, '$.distro') IS NULL))`
+		args = append(args, filter.Distro, filter.Distro)
+	}
+
+	if filter.Version != "" {
+		where += ` AND version=?`
+		args = append(args, filter.Version)
+	}
+
+	if filter.Query != "" {
+		where += ` AND (profile LIKE ? OR request_hash LIKE ?)`
+		like := "%" + filter.Query + "%"
+		args = append(args, like, like)
+	}
+
 	if err := q.DB.QueryRowContext(ctx, `SELECT count(*) FROM jobs`+where, args...).Scan(&list.Total); err != nil {
 		return list, err
 	}
