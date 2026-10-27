@@ -97,7 +97,9 @@ func runServe(parent context.Context, cfg config.Config) error {
 	admin.RegisterLogs(adminGroup, stream.Service{Hub: hub, Jobs: jobs})
 	artifactStore := &store.Local{Dir: cfg.StoreDir()}
 	jobs.Publisher = artifactStore
-	api.RegisterStore(router, artifactStore)
+	api.RegisterStore(router, artifactStore, jobs.StoreVisible)
+	cleaner := &queue.Cleaner{Jobs: jobs, Store: artifactStore, StoreDir: cfg.StoreDir(), Interval: cfg.Cleaner.Interval, OrphanGrace: cfg.Cleaner.OrphanGrace, Logger: logger.With(zap.String("component", "cleaner"))}
+	admin.RegisterStore(adminGroup, cleaner)
 	admin.RegisterJobs(adminGroup, jobs)
 	api.RegisterBuild(router, jobs)
 	router.GET("/healthz", func(c *gin.Context) {
@@ -114,6 +116,7 @@ func runServe(parent context.Context, cfg config.Config) error {
 		BaseContext:       func(net.Listener) context.Context { return ctx },
 	}
 	group, groupCtx := errgroup.WithContext(ctx)
+	group.Go(func() error { return cleaner.Run(groupCtx) })
 	group.Go(func() error { return jobs.Run(groupCtx) })
 	scavenger := &runner.Scavenger{Runtime: rt, Jobs: jobs, Interval: cfg.Runtime.ScavengerInterval, KeepContainerTTL: cfg.Diagnostics.KeepContainerTTL, MaxKept: cfg.Diagnostics.MaxKept}
 	group.Go(func() error { return scavenger.Run(groupCtx) })

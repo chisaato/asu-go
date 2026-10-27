@@ -35,6 +35,10 @@ store:
   driver: local
   # 留空时跟随 data_dir，使用 {data_dir}/store。
   dir: ""
+cleaner:
+  interval: 10m
+  # 仅删除无 jobs 记录的公开 hash 目录；内部临时目录保留。
+  orphan_grace: 1h
 stats:
   driver: sqlite
 runtime:
