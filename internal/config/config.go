@@ -159,7 +159,7 @@ func Decode(r io.Reader) (Config, error) {
 // Load 显式指定的文件必须存在；否则依次查找当前目录和系统配置。
 func Load(path string, flags Overrides) (Config, error) {
 	cfg := Default()
-	paths := []string{"asu.yaml", "/etc/asu/asu.yaml"}
+	paths := []string{"asu.yaml", "asu.yml", "/etc/asu/asu.yaml", "/etc/asu/asu.yml"}
 	if path != "" {
 		paths = []string{path}
 	}

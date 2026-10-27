@@ -72,7 +72,7 @@ asu config check                # 校验配置并打印生效配置
 asu version
 ```
 
-全局 flag：`--config`（默认依次查找 `./asu.yaml`、`/etc/asu/asu.yaml`）、`--log-level`。
+全局 flag：`--config`（默认依次查找 `./asu.yaml`、`./asu.yml`、`/etc/asu/asu.yaml`、`/etc/asu/asu.yml`）、`--log-level`。
 
 ### 3.2 配置（YAML，不用 Viper）
 

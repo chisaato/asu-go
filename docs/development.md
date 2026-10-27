@@ -3,7 +3,7 @@
 ## Compose 部署
 
 ```bash
-cp configs/asu.compose.yaml asu.yaml        # 按需修改；asu.yaml 已被 git 忽略
+cp configs/asu.compose.yaml asu.yaml        # 按需修改；asu.yaml / asu.yml 均已被 git 忽略；Compose 默认挂载 ./asu.yaml，使用 .yml 请同步修改 compose.yaml 里的挂载源
 mkdir -p data
 docker compose up -d --build                # Podman: podman compose up -d --build
 ```
@@ -16,7 +16,7 @@ docker compose up -d --build                # Podman: podman compose up -d --bui
 
 ## 本地开发（含 GoLand）
 
-准备一份本地配置（仓库根目录 `asu.yaml`，已被 git 忽略）：
+准备一份本地配置（仓库根目录 `asu.yaml` 或 `asu.yml`，均已被 git 忽略；本地运行两者都会被自动查找）：
 
 ```yaml
 server: {listen: ":8000"}

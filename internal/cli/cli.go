@@ -16,7 +16,7 @@ func NewCommand() *cobra.Command {
 	var path, listen, level, dataDir, server, token string
 	root.PersistentFlags().StringVar(&server, "server", "http://127.0.0.1:8000", "管理 API 地址")
 	root.PersistentFlags().StringVar(&token, "token", "", "管理 API Bearer token（也读取 ASU_ADMIN_TOKEN 或配置）")
-	root.PersistentFlags().StringVar(&path, "config", "", "配置文件（默认查找 ./asu.yaml、/etc/asu/asu.yaml）")
+	root.PersistentFlags().StringVar(&path, "config", "", "配置文件（默认依次查找 ./asu.yaml、./asu.yml、/etc/asu/asu.yaml、/etc/asu/asu.yml）")
 	root.PersistentFlags().StringVar(&level, "log-level", "", "日志级别")
 	root.PersistentFlags().StringVar(&listen, "listen", "", "服务监听地址")
 	root.PersistentFlags().StringVar(&dataDir, "data-dir", "", "数据目录")
