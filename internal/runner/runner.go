@@ -11,8 +11,10 @@ import (
 	"sync"
 	"time"
 
+	logging "github.com/gzzchh/asu-go/internal/logcontext"
 	"github.com/gzzchh/asu-go/internal/runtime"
 	"github.com/gzzchh/asu-go/internal/stream"
+	"go.uber.org/zap"
 )
 
 type Stage struct {
@@ -20,6 +22,7 @@ type Stage struct {
 	At   time.Time `json:"at"`
 }
 type Job struct {
+	Distribution, Version, Target   string
 	ID, Image, Profile, VersionCode string
 	Packages                        []string
 	PackageVersions                 map[string]string
@@ -59,6 +62,7 @@ func (e *Error) Error() string {
 func (e *Error) Unwrap() error { return e.Cause }
 
 type Runner struct {
+	Logger         *zap.Logger
 	Runtime        runtime.Runtime
 	Hub            *stream.Hub
 	JobTimeout     time.Duration
@@ -80,6 +84,7 @@ func (r *Runner) Resume(parent context.Context, j Job, h runtime.Handle) (Result
 	}
 	s, err := r.Runtime.Inspect(parent, h)
 	if err != nil {
+		logging.OrNop(r.Logger).Warn("接管环境检查失败", zap.String("component", "runner"), zap.String("request_hash", j.ID), zap.String("container", string(h)), zap.Error(err))
 		if parent.Err() != nil {
 			// 取消可能先于接管的 Inspect；仍走统一 Kill/Remove 收尾。
 			return r.execute(parent, j, h)
@@ -87,6 +92,7 @@ func (r *Runner) Resume(parent context.Context, j Job, h runtime.Handle) (Result
 		return Result{}, err
 	}
 	if !s.Exists {
+		logging.OrNop(r.Logger).Warn("接管环境已不存在", zap.String("component", "runner"), zap.String("request_hash", j.ID), zap.String("container", string(h)), zap.Error(errors.New("interrupted")))
 		return Result{Handle: h, ExitCode: -1}, &Error{Kind: "interrupted", ExitCode: -1, Cause: errors.New("interrupted")}
 	}
 	return r.execute(parent, j, h)
@@ -120,6 +126,24 @@ func (r *Runner) prepare(ctx context.Context, j Job) error {
 }
 
 func (r *Runner) execute(parent context.Context, j Job, existing runtime.Handle) (result Result, err error) {
+	started := time.Now()
+	log := logging.OrNop(r.Logger).With(zap.String("component", "runner"), zap.String("job_id", j.ID), zap.String("request_hash", j.ID), zap.String("request_id", logging.RequestID(parent)), zap.String("distribution", j.Distribution), zap.String("version", j.Version), zap.String("target", j.Target), zap.String("profile", j.Profile))
+	log.Info("作业开始", zap.Bool("resumed", existing != ""))
+	defer func() {
+		fields := []zap.Field{zap.Duration("duration", time.Since(started)), zap.Int64("exit_code", result.ExitCode)}
+		if err != nil {
+			kind := "failed"
+			cause := err
+			var failure *Error
+			if errors.As(err, &failure) {
+				kind, cause = failure.Kind, failure.Cause
+			}
+			// Error.Error 包含构建输出尾部；应用日志只记录原因，绝不复制构建输出。
+			log.Error("作业失败", append(fields, zap.String("reason", kind), zap.Error(cause))...)
+		} else {
+			log.Info("作业完成", fields...)
+		}
+	}()
 	if err = stream.ValidateID(j.ID); err != nil {
 		return result, err
 	}
@@ -146,10 +170,22 @@ func (r *Runner) execute(parent context.Context, j Job, existing runtime.Handle)
 			cleanup, stop := context.WithTimeout(context.Background(), 15*time.Second)
 			defer stop()
 			if err != nil {
-				err = errors.Join(err, r.Runtime.Kill(cleanup, result.Handle))
+				killErr := r.Runtime.Kill(cleanup, result.Handle)
+				if killErr != nil {
+					log.Error("清理在途环境失败", zap.String("operation", "kill"), zap.String("container", string(result.Handle)), zap.Error(killErr))
+				} else {
+					log.Info("清理在途环境", zap.String("operation", "kill"), zap.String("container", string(result.Handle)))
+				}
+				err = errors.Join(err, killErr)
 			}
 			if err == nil || !j.KeepContainer || cause != nil {
-				err = errors.Join(err, r.Runtime.Remove(cleanup, result.Handle))
+				removeErr := r.Runtime.Remove(cleanup, result.Handle)
+				if removeErr != nil {
+					log.Error("清理执行环境失败", zap.String("operation", "remove"), zap.String("container", string(result.Handle)), zap.Error(removeErr))
+				} else {
+					log.Info("清理执行环境", zap.String("operation", "remove"), zap.String("container", string(result.Handle)))
+				}
+				err = errors.Join(err, removeErr)
 			}
 		}
 		err = errors.Join(err, r.Hub.Finish(j.ID))
@@ -190,6 +226,7 @@ func (r *Runner) execute(parent context.Context, j Job, existing runtime.Handle)
 		if err != nil {
 			return result, err
 		}
+		log.Info("执行环境已创建", zap.String("operation", "create"), zap.String("container", string(result.Handle)), zap.String("image", j.Image))
 		if j.OnHandle != nil {
 			if err = j.OnHandle(ctx, result.Handle); err != nil {
 				return result, err
@@ -198,9 +235,11 @@ func (r *Runner) execute(parent context.Context, j Job, existing runtime.Handle)
 		if err = r.Runtime.PutArchive(ctx, result.Handle, "/builder", bytes.NewReader(archive)); err != nil {
 			return result, err
 		}
+		log.Debug("输入已注入", zap.String("operation", "put_archive"), zap.Int("bytes", len(archive)))
 		if err = r.Runtime.Start(ctx, result.Handle); err != nil {
 			return result, err
 		}
+		log.Info("执行环境已启动", zap.String("operation", "start"), zap.String("container", string(result.Handle)))
 	}
 	logs, err := r.Runtime.Logs(ctx, result.Handle, runtime.LogsOptions{Follow: true, Timestamps: existing != ""})
 	if err != nil {
@@ -209,7 +248,11 @@ func (r *Runner) execute(parent context.Context, j Job, existing runtime.Handle)
 	defer func() { _ = logs.Close() }()
 	scanner := bufio.NewScanner(logs)
 	scanner.Buffer(make([]byte, 4096), 4<<20)
+	lines := 0
+	lastStage := ""
+	stageStarted := time.Now()
 	for scanner.Scan() {
+		lines++
 		line := scanner.Text()
 		at := time.Now().UTC()
 		if existing != "" {
@@ -223,6 +266,10 @@ func (r *Runner) execute(parent context.Context, j Job, existing runtime.Handle)
 			return result, err
 		}
 		if name, ok := strings.CutPrefix(line, "##asu:stage="); ok && validStage(name) {
+			if name != lastStage {
+				log.Info("构建阶段变化", zap.String("stage", name), zap.String("previous_stage", lastStage), zap.Duration("stage_duration", time.Since(stageStarted)))
+				lastStage, stageStarted = name, time.Now()
+			}
 			stage := Stage{Name: name, At: at}
 			result.Stages = append(result.Stages, stage)
 			if j.OnStage != nil {
@@ -232,6 +279,9 @@ func (r *Runner) execute(parent context.Context, j Job, existing runtime.Handle)
 			}
 		}
 	}
+	if existing != "" {
+		log.Info("接管日志重放完成", zap.Int("replayed_lines", lines))
+	}
 	if err = scanner.Err(); err != nil {
 		return result, err
 	}
@@ -240,10 +290,11 @@ func (r *Runner) execute(parent context.Context, j Job, existing runtime.Handle)
 		return result, err
 	}
 	result.ExitCode = exit.Code
+	log.Info("执行环境已结束", zap.String("operation", "wait"), zap.String("container", string(result.Handle)), zap.Int64("exit_code", exit.Code))
 	if exit.Code != 0 {
 		return result, fmt.Errorf("Error while building firmware")
 	}
-	if err = extract(ctx, r.Runtime, result.Handle, "/builder/"+j.ID, j.ArtifactDir); err != nil {
+	if err = extract(ctx, r.Runtime, result.Handle, "/builder/"+j.ID, j.ArtifactDir, log); err != nil {
 		return result, fmt.Errorf("取回产物: %w", err)
 	}
 	result.ArtifactDir = j.ArtifactDir

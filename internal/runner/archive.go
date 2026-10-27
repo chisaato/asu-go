@@ -11,8 +11,10 @@ import (
 	"path"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/gzzchh/asu-go/internal/runtime"
+	"go.uber.org/zap"
 )
 
 func inputs(j Job) ([]byte, error) {
@@ -94,7 +96,21 @@ func inputs(j Job) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-func extract(ctx context.Context, rt runtime.Runtime, h runtime.Handle, source, dest string) error {
+func extract(ctx context.Context, rt runtime.Runtime, h runtime.Handle, source, dest string, loggers ...*zap.Logger) (err error) {
+	log := zap.NewNop()
+	if len(loggers) > 0 && loggers[0] != nil {
+		log = loggers[0]
+	}
+	started := time.Now()
+	files, bytes := 0, int64(0)
+	defer func() {
+		fields := []zap.Field{zap.Int("files", files), zap.Int64("bytes", bytes), zap.Duration("duration", time.Since(started))}
+		if err != nil {
+			log.Error("产物提取失败", append(fields, zap.Error(err))...)
+		} else {
+			log.Info("产物提取完成", fields...)
+		}
+	}()
 	r, err := rt.GetArchive(ctx, h, source)
 	if err != nil {
 		return err
@@ -157,7 +173,8 @@ func extract(ctx context.Context, rt runtime.Runtime, h runtime.Handle, source, 
 		if e != nil {
 			return e
 		}
-		_, copyErr := io.Copy(f, tr)
+		n, copyErr := io.Copy(f, tr)
+		bytes += n
 		chmodErr := f.Chmod(0644)
 		closeErr := f.Close()
 		if copyErr != nil {
@@ -169,5 +186,6 @@ func extract(ctx context.Context, rt runtime.Runtime, h runtime.Handle, source, 
 		if closeErr != nil {
 			return closeErr
 		}
+		files++
 	}
 }

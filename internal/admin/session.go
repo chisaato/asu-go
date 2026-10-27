@@ -15,6 +15,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/gzzchh/asu-go/internal/config"
+	logging "github.com/gzzchh/asu-go/internal/logcontext"
 	"go.uber.org/zap"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -38,6 +39,7 @@ type loginAttempt struct {
 
 // Sessions 不依赖后台 goroutine；失败窗口在下一次登录时惰性回收。
 type Sessions struct {
+	logger    *zap.Logger
 	secret    []byte
 	ttl       time.Duration
 	users     map[string]string
@@ -65,6 +67,7 @@ func RegisterAuth(router *gin.Engine, cfg config.Admin, logger *zap.Logger) (*gi
 }
 
 func newSessions(cfg config.Admin, logger *zap.Logger) (*Sessions, error) {
+	logger = logging.OrNop(logger).With(zap.String("component", "admin"))
 	secret := []byte(cfg.SessionSecret)
 	if len(secret) == 0 {
 		secret = make([]byte, 32)
@@ -77,7 +80,7 @@ func newSessions(cfg config.Admin, logger *zap.Logger) (*Sessions, error) {
 	if err != nil {
 		return nil, fmt.Errorf("初始化密码校验: %w", err)
 	}
-	s := &Sessions{secret: secret, ttl: cfg.SessionTTL, users: make(map[string]string), dummyHash: dummy,
+	s := &Sessions{logger: logger, secret: secret, ttl: cfg.SessionTTL, users: make(map[string]string), dummyHash: dummy,
 		bearer: BearerAuthenticator(cfg.APIToken), now: time.Now, attempts: make(map[string]loginAttempt)}
 	for _, user := range cfg.Users {
 		s.users[user.Name] = user.PasswordHash
@@ -122,6 +125,11 @@ func (s *Sessions) authenticate(r *http.Request) (string, bool) {
 
 func (s *Sessions) middleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
+		defer func() {
+			if name := c.GetString("admin_name"); name != "" && c.Request.Method != http.MethodGet && c.Request.Method != http.MethodHead && c.Request.Method != http.MethodOptions {
+				logging.OrNop(s.logger).Info("管理接口写操作", zap.String("operator", name), zap.String("method", c.Request.Method), zap.String("route", c.FullPath()), zap.String("path", c.Request.URL.Path), zap.Int("status", c.Writer.Status()), zap.String("request_id", logging.RequestID(c.Request.Context())))
+			}
+		}()
 		c.Header("Cache-Control", "no-store")
 		if s.bearer != nil && s.bearer(c.Request) {
 			c.Set("admin_name", "api_token")
@@ -166,6 +174,15 @@ func (s *Sessions) reserve(key string) bool {
 }
 
 func (s *Sessions) login(c *gin.Context) {
+	defer func() {
+		log := logging.OrNop(s.logger)
+		fields := []zap.Field{zap.String("request_id", logging.RequestID(c.Request.Context())), zap.String("client_ip", c.Request.RemoteAddr), zap.Int("status", c.Writer.Status())}
+		if c.Writer.Status() >= 400 {
+			log.Warn("管理登录失败", append(fields, zap.Error(fmt.Errorf("login rejected: HTTP %d", c.Writer.Status())))...)
+		} else {
+			log.Info("管理登录成功", append(fields, zap.String("operator", c.GetString("admin_name")))...)
+		}
+	}()
 	c.Header("Cache-Control", "no-store")
 	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, 4096)
 	var input struct {
@@ -200,6 +217,7 @@ func (s *Sessions) login(c *gin.Context) {
 	delete(s.attempts, key)
 	s.mu.Unlock()
 	s.setCookie(c, s.encode(input.Name), int(s.ttl.Seconds()), s.now().Add(s.ttl))
+	c.Set("admin_name", input.Name)
 	c.JSON(http.StatusOK, gin.H{"name": input.Name})
 }
 

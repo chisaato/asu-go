@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	logging "github.com/gzzchh/asu-go/internal/logcontext"
 	"github.com/gzzchh/asu-go/internal/store"
 	"github.com/gzzchh/asu-go/internal/stream"
 	"go.uber.org/zap"
@@ -83,9 +84,24 @@ func (c *Cleaner) removeArtifacts(ctx context.Context, id string) error {
 	return c.Store.Delete(ctx, id)
 }
 
-func (c *Cleaner) Sweep(ctx context.Context) error {
+func (c *Cleaner) Sweep(ctx context.Context) (err error) {
 	c.Jobs.mu.Lock()
 	defer c.Jobs.mu.Unlock()
+	started := time.Now()
+	removed := 0
+	before, usageErr := c.usage(ctx)
+	defer func() {
+		after, afterErr := c.usage(ctx)
+		fields := []zap.Field{zap.Int("removed", removed), zap.Int64("freed_bytes", max(before-after, 0)), zap.Bool("usage_available", usageErr == nil && afterErr == nil), zap.Duration("duration", time.Since(started))}
+		log := logging.OrNop(c.Logger)
+		if err != nil {
+			log.Warn("TTL 清理未完成", append(fields, zap.Error(err))...)
+		} else if removed > 0 {
+			log.Info("TTL 清理完成", fields...)
+		} else {
+			log.Debug("TTL 清理完成", fields...)
+		}
+	}()
 	now := c.now()
 	rows, err := c.Jobs.DB.QueryContext(ctx, `SELECT request_hash,expires_at,purge_at,COALESCE(json_extract(options,'$.keep_container'),0),COALESCE(json_extract(result,'$.artifacts_removed'),0) FROM jobs WHERE status IN ('done','failed')`)
 	if err != nil {
@@ -116,6 +132,13 @@ func (c *Cleaner) Sweep(ctx context.Context) error {
 		if !purge && !item.removed && (!expired || item.keep || strings.HasPrefix(item.id, "rp_")) {
 			continue
 		}
+		artifactDir := c.StoreDir
+		if strings.HasPrefix(item.id, "rp_") {
+			artifactDir = filepath.Join(c.Jobs.Options.DataDir, "diagnostics")
+		}
+		_, artifactErr := os.Lstat(filepath.Join(artifactDir, item.id))
+		_, logErr := os.Lstat(filepath.Join(c.Jobs.Options.DataDir, "logs", item.id+".log"))
+		hadFiles := artifactErr == nil || ((purge || item.removed) && logErr == nil)
 		err := c.removeArtifacts(ctx, item.id)
 		if purge || item.removed {
 			err = errors.Join(err, c.removeLog(item.id))
@@ -127,17 +150,30 @@ func (c *Cleaner) Sweep(ctx context.Context) error {
 			}
 		}
 		c.warn(item.id, err)
+		if err == nil && (purge || hadFiles) {
+			removed++
+		}
 	}
-	return c.orphans(ctx, now)
+	orphanRemoved, err := c.orphans(ctx, now)
+	removed += orphanRemoved
+	return err
 }
 
-func (c *Cleaner) orphans(ctx context.Context, now time.Time) error {
+func (c *Cleaner) usage(ctx context.Context) (int64, error) {
+	public, err := c.Store.Usage(ctx)
+	diagnostics, diagnosticsErr := (&store.Local{Dir: filepath.Join(c.Jobs.Options.DataDir, "diagnostics")}).Usage(ctx)
+	logs, logsErr := (&store.Local{Dir: filepath.Join(c.Jobs.Options.DataDir, "logs")}).Usage(ctx)
+	return public + diagnostics + logs, errors.Join(err, diagnosticsErr, logsErr)
+}
+
+func (c *Cleaner) orphans(ctx context.Context, now time.Time) (int, error) {
+	removed := 0
 	entries, err := os.ReadDir(c.StoreDir)
 	if errors.Is(err, os.ErrNotExist) {
-		return nil
+		return 0, nil
 	}
 	if err != nil {
-		return err
+		return 0, err
 	}
 	grace := c.OrphanGrace
 	if grace <= 0 {
@@ -161,10 +197,13 @@ func (c *Cleaner) orphans(ctx context.Context, now time.Time) error {
 		err = c.Jobs.DB.QueryRowContext(ctx, `SELECT count(*) FROM jobs WHERE request_hash=?`, id).Scan(&exists)
 		if err == nil && exists == 0 {
 			err = c.Store.Delete(ctx, id)
+			if err == nil {
+				removed++
+			}
 		}
 		c.warn(id, err)
 	}
-	return nil
+	return removed, nil
 }
 
 // Delete 保留诊断记录，将结果标记并使公开轮询立即与过期一致（404）。

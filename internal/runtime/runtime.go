@@ -4,6 +4,8 @@ import (
 	"context"
 	"io"
 	"time"
+
+	"go.uber.org/zap"
 )
 
 // Handle 是可持久化的不透明值，只能保存、恢复并传回驱动。
@@ -33,6 +35,7 @@ type State struct {
 
 // Options 由配置组装层映射，避免 runtime 反向依赖 config。
 type Options struct {
+	Logger      *zap.Logger
 	Socket      string
 	MemoryLimit int64
 	CPUs        float64

@@ -18,6 +18,8 @@ import (
 	"github.com/gzzchh/asu-go/internal/config"
 	"github.com/gzzchh/asu-go/internal/cors"
 	"github.com/gzzchh/asu-go/internal/db"
+	"github.com/gzzchh/asu-go/internal/httplog"
+	"github.com/gzzchh/asu-go/internal/logcontext"
 	"github.com/gzzchh/asu-go/internal/logging"
 	"github.com/gzzchh/asu-go/internal/metadata"
 	"github.com/gzzchh/asu-go/internal/queue"
@@ -40,7 +42,7 @@ func runServe(parent context.Context, cfg config.Config) error {
 		return err
 	}
 	defer func() { _ = logger.Sync() }()
-	logger = logger.With(zap.String("component", "server"))
+	logger.Info("生效配置", zap.String("component", "server"), zap.String("version", Version), zap.String("listen", cfg.Server.Listen), zap.String("data_dir", cfg.DataDir), zap.String("engine", cfg.Runtime.Driver), zap.String("socket", cfg.Runtime.Socket), zap.Int("max_concurrent_builds", cfg.Queue.MaxConcurrentBuilds), zap.String("queue_driver", cfg.Queue.Driver), zap.String("store_driver", cfg.Store.Driver), zap.String("stats_driver", cfg.Stats.Driver), zap.String("log_level", cfg.Log.Level), zap.String("log_format", cfg.Log.Format))
 	ctx, stop := signal.NotifyContext(parent, os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	database, err := db.Open(ctx, cfg.DataDir)
@@ -57,17 +59,18 @@ func runServe(parent context.Context, cfg config.Config) error {
 	}
 	gin.SetMode(gin.ReleaseMode)
 	router := gin.New()
-	webui.Register(router)
 	router.Use(func(c *gin.Context) {
 		defer func() {
 			if recovered := recover(); recovered != nil {
-				logger.Error("HTTP 请求处理异常", zap.Any("panic", recovered))
+				logger.Error("HTTP 请求处理异常", zap.String("component", "http"), zap.String("request_id", logcontext.RequestID(c.Request.Context())), zap.String("panic_type", fmt.Sprintf("%T", recovered)), zap.Error(errors.New("HTTP handler panic")))
 				c.AbortWithStatus(http.StatusInternalServerError)
 			}
 		}()
 		c.Next()
 	})
+	router.Use(httplog.HTTP(logger))
 	router.Use(cors.New(cfg.Server.CORS))
+	webui.Register(router)
 	adminGroup, err := admin.RegisterAuth(router, cfg.Admin, logger)
 	if err != nil {
 		return err
@@ -82,7 +85,7 @@ func runServe(parent context.Context, cfg config.Config) error {
 		return fmt.Errorf("日志 Hub: %w", err)
 	}
 	defer func() { _ = hub.Close() }()
-	rt, err := runtime.Open(cfg.Runtime.Driver, runtime.Options{Socket: cfg.Runtime.Socket, MemoryLimit: cfg.Runtime.MemoryLimit, CPUs: cfg.Runtime.CPUs, PullPolicy: cfg.Runtime.PullPolicy})
+	rt, err := runtime.Open(cfg.Runtime.Driver, runtime.Options{Logger: logger, Socket: cfg.Runtime.Socket, MemoryLimit: cfg.Runtime.MemoryLimit, CPUs: cfg.Runtime.CPUs, PullPolicy: cfg.Runtime.PullPolicy})
 	if err != nil {
 		return err
 	}
@@ -90,14 +93,14 @@ func runServe(parent context.Context, cfg config.Config) error {
 	if _, err := rt.Info(ctx); err != nil {
 		return err
 	}
-	buildRunner := &runner.Runner{Runtime: rt, Hub: hub, JobTimeout: cfg.Queue.JobTimeout, RollingRecheck: cfg.Runtime.RollingRecheck}
+	buildRunner := &runner.Runner{Logger: logger, Runtime: rt, Hub: hub, JobTimeout: cfg.Queue.JobTimeout, RollingRecheck: cfg.Runtime.RollingRecheck}
 	jobs := queue.NewSQLite(database.DB, catalog, meta, buildRunner, queue.Options{
-		DataDir: cfg.DataDir, MaxConcurrentBuilds: cfg.Queue.MaxConcurrentBuilds, MaxPendingJobs: cfg.Queue.MaxPendingJobs,
+		Logger: logger, DataDir: cfg.DataDir, MaxConcurrentBuilds: cfg.Queue.MaxConcurrentBuilds, MaxPendingJobs: cfg.Queue.MaxPendingJobs,
 		BuildTTL: cfg.Queue.BuildTTL, BuildUnversionedTTL: cfg.Queue.BuildUnversionedTTL, BuildDefaultsTTL: cfg.Queue.BuildDefaultsTTL, BuildFailureTTL: cfg.Queue.BuildFailureTTL, Retention: cfg.Diagnostics.Retention,
 		Limits: buildreq.Limits{AllowDefaults: cfg.Build.AllowDefaults, MaxDefaultsLength: cfg.Build.MaxDefaultsLength, MaxCustomRootfsSizeMB: cfg.Build.MaxCustomRootfsSizeMB, RepositoryAllowList: cfg.Build.RepositoryAllowList},
 	})
 	admin.RegisterLogs(adminGroup, stream.Service{Hub: hub, Jobs: jobs})
-	artifactStore := &store.Local{Dir: cfg.StoreDir()}
+	artifactStore := &store.Local{Dir: cfg.StoreDir(), Logger: logger}
 	jobs.Publisher = artifactStore
 	api.RegisterStore(router, artifactStore, jobs.StoreVisible)
 	cleaner := &queue.Cleaner{Jobs: jobs, Store: artifactStore, StoreDir: cfg.StoreDir(), Interval: cfg.Cleaner.Interval, OrphanGrace: cfg.Cleaner.OrphanGrace, Logger: logger.With(zap.String("component", "cleaner"))}
@@ -120,12 +123,12 @@ func runServe(parent context.Context, cfg config.Config) error {
 	group, groupCtx := errgroup.WithContext(ctx)
 	group.Go(func() error { return cleaner.Run(groupCtx) })
 	group.Go(func() error { return jobs.Run(groupCtx) })
-	scavenger := &runner.Scavenger{Runtime: rt, Jobs: jobs, Interval: cfg.Runtime.ScavengerInterval, KeepContainerTTL: cfg.Diagnostics.KeepContainerTTL, MaxKept: cfg.Diagnostics.MaxKept}
+	scavenger := &runner.Scavenger{Logger: logger, Runtime: rt, Jobs: jobs, Interval: cfg.Runtime.ScavengerInterval, KeepContainerTTL: cfg.Diagnostics.KeepContainerTTL, MaxKept: cfg.Diagnostics.MaxKept}
 	group.Go(func() error { return scavenger.Run(groupCtx) })
 	syncer := &metadata.Syncer{Store: catalog, Client: upstream, Logger: logger.With(zap.String("component", "metadata"))}
 	group.Go(func() error { return syncer.Run(groupCtx, cfg.Metadata.RefreshInterval) })
 	group.Go(func() error {
-		logger.Info("服务已启动", zap.String("listen", listener.Addr().String()))
+		logger.Info("服务已启动", zap.String("component", "server"), zap.String("listen", listener.Addr().String()))
 		if err := server.Serve(listener); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			return fmt.Errorf("HTTP 服务: %w", err)
 		}
@@ -135,7 +138,7 @@ func runServe(parent context.Context, cfg config.Config) error {
 		<-groupCtx.Done()
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
-		logger.Info("正在关闭服务")
+		logger.Info("正在关闭服务", zap.String("component", "server"))
 		if err := server.Shutdown(shutdownCtx); err != nil {
 			_ = server.Close()
 			return fmt.Errorf("关闭 HTTP 服务: %w", err)

@@ -11,6 +11,10 @@ import (
 	"regexp"
 	"strings"
 	"sync"
+	"time"
+
+	logging "github.com/gzzchh/asu-go/internal/logcontext"
+	"go.uber.org/zap"
 )
 
 // File 是可用于 Range 下载的文件视图，调用方负责关闭。
@@ -53,11 +57,13 @@ func validateFile(name string) error {
 
 // Local 串行化目录切换，使读取者看不到替换间隙；os.Root 限制符号链接边界。
 type Local struct {
-	Dir string
-	mu  sync.Mutex
+	Logger *zap.Logger
+	Dir    string
+	mu     sync.Mutex
 }
 
-func (s *Local) Publish(ctx context.Context, hash, srcDir string) error {
+func (s *Local) Publish(ctx context.Context, hash, srcDir string) (err error) {
+	defer s.logOperation("publish", hash, time.Now(), &err)
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if err := ctx.Err(); err != nil {
@@ -159,7 +165,8 @@ func (s *Local) Stat(ctx context.Context, hash, name string) (fs.FileInfo, error
 	return f.Stat()
 }
 
-func (s *Local) Delete(ctx context.Context, hash string) error {
+func (s *Local) Delete(ctx context.Context, hash string) (err error) {
+	defer s.logOperation("delete", hash, time.Now(), &err)
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if err := ctx.Err(); err != nil {
@@ -177,6 +184,15 @@ func (s *Local) Delete(ctx context.Context, hash string) error {
 	}
 	defer func() { _ = root.Close() }()
 	return root.RemoveAll(hash)
+}
+
+func (s *Local) logOperation(operation, hash string, started time.Time, err *error) {
+	log := logging.OrNop(s.Logger).With(zap.String("component", "store"), zap.String("operation", operation), zap.String("request_hash", hash), zap.Duration("duration", time.Since(started)))
+	if *err != nil {
+		log.Error("产物存储操作失败", zap.Error(*err))
+	} else {
+		log.Info("产物存储操作完成")
+	}
 }
 
 func (s *Local) Usage(ctx context.Context) (int64, error) {

@@ -11,6 +11,9 @@ import (
 	"strings"
 	"time"
 
+	logging "github.com/gzzchh/asu-go/internal/logcontext"
+	"go.uber.org/zap"
+
 	"github.com/gzzchh/asu-go/internal/buildreq"
 	"github.com/gzzchh/asu-go/internal/runner"
 )
@@ -138,6 +141,7 @@ func (q *SQLite) Replay(ctx context.Context, origin string, r buildreq.Request, 
 	if err != nil {
 		return Response{}, err
 	}
+	logging.OrNop(q.Options.Logger).Info("诊断重放作业已入队", zap.String("component", "queue"), zap.String("request_hash", id), zap.String("job_id", id), zap.String("replay_of", origin), zap.String("request_id", logging.RequestID(ctx)), zap.String("distribution", r.Distro), zap.String("version", r.Version), zap.String("target", r.Target), zap.String("profile", resolved))
 	q.notify()
 	return Response{Status: 202, Body: map[string]any{"id": id, "request_hash": id, "replay_of": origin}}, nil
 }
@@ -198,6 +202,11 @@ func (q *SQLite) Cancel(ctx context.Context, id string) (Response, error) {
 		if err == nil && q.active[id] != nil {
 			q.active[id]()
 		}
+	}
+	if err != nil {
+		logging.OrNop(q.Options.Logger).Error("取消作业失败", zap.String("component", "queue"), zap.String("request_hash", id), zap.Error(err))
+	} else {
+		logging.OrNop(q.Options.Logger).Info("作业取消已请求", zap.String("component", "queue"), zap.String("request_hash", id), zap.String("job_id", id), zap.String("previous_status", status), zap.String("request_id", logging.RequestID(ctx)))
 	}
 	return Response{Status: 202, Body: map[string]any{"id": id, "detail": "cancelled"}}, err
 }

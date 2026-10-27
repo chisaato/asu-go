@@ -6,10 +6,13 @@ import (
 	"sort"
 	"time"
 
+	logging "github.com/gzzchh/asu-go/internal/logcontext"
 	"github.com/gzzchh/asu-go/internal/runtime"
+	"go.uber.org/zap"
 )
 
 type Scavenger struct {
+	Logger           *zap.Logger
 	Runtime          runtime.Runtime
 	Jobs             JobStore
 	Interval         time.Duration
@@ -18,12 +21,26 @@ type Scavenger struct {
 	MaxKept int
 }
 
-func (s *Scavenger) Sweep(ctx context.Context) error {
+func (s *Scavenger) Sweep(ctx context.Context) (err error) {
+	started := time.Now()
+	found, removed, scanned := 0, 0, 0
+	defer func() {
+		log := logging.OrNop(s.Logger).With(zap.String("component", "scavenger"))
+		fields := []zap.Field{zap.Int("scanned", scanned), zap.Int("found", found), zap.Int("removed", removed), zap.Duration("duration", time.Since(started))}
+		if err != nil {
+			log.Error("孤儿扫描失败", append(fields, zap.Error(err))...)
+		} else if found > 0 {
+			log.Info("孤儿扫描完成", fields...)
+		} else {
+			log.Debug("孤儿扫描完成", fields...)
+		}
+	}()
 	// 先列举资源，再读最新活跃任务，避免新建任务落在过时快照之外。
 	states, err := s.Runtime.List(ctx)
 	if err != nil {
 		return err
 	}
+	scanned = len(states)
 	tasks, err := s.Jobs.Active(ctx)
 	if err != nil {
 		return err
@@ -68,6 +85,7 @@ func (s *Scavenger) Sweep(ctx context.Context) error {
 	if len(kept) > limit {
 		cleanup = append(cleanup, kept[limit:]...)
 	}
+	found = len(cleanup)
 	for _, state := range cleanup {
 		// 每次删除前刷新任务状态；数据库错误时绝不猜测“没有活跃任务”。
 		tasks, err := s.Jobs.Active(ctx)
@@ -80,6 +98,7 @@ func (s *Scavenger) Sweep(ctx context.Context) error {
 		if err := s.Runtime.Remove(ctx, state.Handle); err != nil {
 			return err
 		}
+		removed++
 	}
 	return nil
 }

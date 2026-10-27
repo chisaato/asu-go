@@ -14,15 +14,18 @@ import (
 	"time"
 
 	"github.com/gzzchh/asu-go/internal/buildreq"
+	logging "github.com/gzzchh/asu-go/internal/logcontext"
 	"github.com/gzzchh/asu-go/internal/metadata"
 	"github.com/gzzchh/asu-go/internal/runner"
 	"github.com/gzzchh/asu-go/internal/runtime"
 	"github.com/gzzchh/asu-go/internal/sources"
 	"github.com/gzzchh/asu-go/internal/store"
+	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
 )
 
 type Options struct {
+	Logger                                                                      *zap.Logger
 	DataDir                                                                     string
 	MaxConcurrentBuilds, MaxPendingJobs                                         int
 	BuildTTL, BuildUnversionedTTL, BuildDefaultsTTL, BuildFailureTTL, Retention time.Duration
@@ -115,6 +118,7 @@ func (q *SQLite) Submit(ctx context.Context, r buildreq.Request, userAgent strin
 		return Response{}, err
 	}
 	if resp.Status != 404 {
+		logging.OrNop(q.Options.Logger).Debug("复用缓存作业", zap.String("component", "queue"), zap.String("request_hash", id), zap.String("request_id", logging.RequestID(ctx)))
 		if err = count(ctx, q.DB, "cache_hits", r.Version); err != nil {
 			return Response{}, err
 		}
@@ -186,6 +190,7 @@ func (q *SQLite) Submit(ctx context.Context, r buildreq.Request, userAgent strin
 		return Response{}, err
 	}
 	if pending >= q.Options.MaxPendingJobs {
+		logging.OrNop(q.Options.Logger).Warn("构建队列已满", zap.String("component", "queue"), zap.Int("pending", pending), zap.String("request_hash", id))
 		return failure(529, fmt.Sprintf("server overload, queue contains too many build requests: %d", pending)), nil
 	}
 	// 同主键的过期记录可再次构建；删除仅限已完成记录，物理清理由 store-ttl 接续。
@@ -200,6 +205,7 @@ func (q *SQLite) Submit(ctx context.Context, r buildreq.Request, userAgent strin
 		return Response{}, err
 	}
 	// 先返回确定的 queued 快照，再唤醒 worker，避免快速构建改变提交响应。
+	logging.OrNop(q.Options.Logger).Info("作业已入队", zap.String("component", "queue"), zap.String("request_hash", id), zap.String("job_id", id), zap.String("request_id", logging.RequestID(ctx)), zap.String("distribution", r.Distro), zap.String("version", r.Version), zap.String("target", r.Target), zap.String("profile", resolved))
 	resp, err = q.Get(ctx, id)
 	q.notify()
 	return resp, err
@@ -417,6 +423,12 @@ func (q *SQLite) execute(ctx context.Context, id string) error {
 	ctx, done := q.ExecutionContext(ctx, id)
 	defer done()
 	job, err := q.job(ctx, id)
+	if err == nil {
+		var enqueued time.Time
+		if queryErr := q.DB.QueryRowContext(ctx, `SELECT enqueued_at FROM jobs WHERE request_hash=?`, id).Scan(&enqueued); queryErr == nil {
+			logging.OrNop(q.Options.Logger).Info("作业已出队", zap.String("component", "queue"), zap.String("request_hash", id), zap.String("job_id", id), zap.Duration("queue_duration", time.Since(enqueued)), zap.String("distribution", job.Distribution), zap.String("version", job.Version), zap.String("target", job.Target), zap.String("profile", job.Profile))
+		}
+	}
 	if job.ArtifactDir != "" {
 		defer func() { _ = os.RemoveAll(job.ArtifactDir) }()
 	}
@@ -455,7 +467,7 @@ func (q *SQLite) job(ctx context.Context, id string) (runner.Job, error) {
 	if err = json.Unmarshal([]byte(options), &opts); err != nil {
 		return runner.Job{}, err
 	}
-	j := runner.Job{ID: id, Image: image, Profile: profile, VersionCode: r.VersionCode, Packages: opts.Packages, PackageVersions: r.PackagesVersions, Repositories: r.Repositories, RepositoriesMode: r.RepositoriesMode, RepositoryKeys: r.RepositoryKeys, Rolling: source.Rolling, ArtifactDir: filepath.Join(q.Options.DataDir, "work", id)}
+	j := runner.Job{Distribution: r.Distro, Version: r.Version, Target: r.Target, ID: id, Image: image, Profile: profile, VersionCode: r.VersionCode, Packages: opts.Packages, PackageVersions: r.PackagesVersions, Repositories: r.Repositories, RepositoriesMode: r.RepositoriesMode, RepositoryKeys: r.RepositoryKeys, Rolling: source.Rolling, ArtifactDir: filepath.Join(q.Options.DataDir, "work", id)}
 	applyReplayOptions(&j, opts.ReplayOptions)
 	j.DiffPackages = r.DiffPackages
 	j.Packages = executionPackages(r, profile)

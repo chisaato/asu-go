@@ -9,8 +9,10 @@ import (
 	"path/filepath"
 	"time"
 
+	logging "github.com/gzzchh/asu-go/internal/logcontext"
 	"github.com/gzzchh/asu-go/internal/runtime"
 	"github.com/gzzchh/asu-go/internal/stream"
+	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -130,6 +132,7 @@ func (r *Runner) Takeover(ctx context.Context, store JobStore, artifactRoot stri
 		if task.Status != "running" {
 			continue
 		}
+		logging.OrNop(r.Logger).Info("重启接管作业", zap.String("component", "runner"), zap.String("job_id", task.ID), zap.String("request_hash", task.ID), zap.String("container", string(task.Handle)))
 		g.Go(func() error {
 			runCtx := groupCtx
 			if controller, ok := store.(interface {

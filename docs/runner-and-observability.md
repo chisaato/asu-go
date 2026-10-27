@@ -109,6 +109,17 @@ go func() {
 - `verbose=true` 时向 `make image` 注入 `V=s`，展示完整打包与安装过程。
 - 阶段事件（`event: stage`）与 SSE 随管理后台二期实现；一期只提供 follow 式纯文本日志 `GET /admin/api/jobs/{hash}/log?follow=1`。
 
+### 3.5 应用日志（Zap）
+
+应用日志与 `{data_dir}/logs/{id}.log` 的构建输出完全分离：绝不把构建输出行（包括失败时的 tail）复制到 Zap；阶段标记仅提取阶段名称。通过 `log.level` / `log.format` 控制级别与 JSON/console 格式。
+
+- 固定使用 snake_case 字段：`component`（`http` / `queue` / `runner` / `runtime` / `scavenger` 等）、`request_hash`、`job_id`、`distribution`、`version`、`target`、`profile`；HTTP 链路额外带 `request_id`。后台任务不伪造 HTTP request_id，通过 request_hash 关联入队请求。
+- 入队、出队（`queue_duration`）、开始/完成/失败（`duration`）、每次阶段变化（`stage`、`previous_stage`、`stage_duration`）均记录。超时/取消通过失败日志中的 `reason` 区分；关闭时记录 kill/remove 清理。耗时字段由 Zap duration encoder 编码，HTTP 的 `latency_ms` 固定毫秒。
+- runtime 记录镜像检查/拉取、网络准备、create、put_archive、start、wait（`exit_code`）、get_archive、kill、remove；归档日志只包含 `bytes`，不包含正文。引擎 HTTP API 的方法、路径、状态和耗时使用 debug，不记录查询串、命令或环境变量。不透明句柄仅在 runtime 与 runner 的 Handle 日志中以 `container` 字段出现。
+- 重启接管记录任务、句柄与 `replayed_lines`；scavenger 每轮记录 `found` / `removed`；TTL cleaner 记录删除数量、公开 store/诊断产物/日志的 `freed_bytes` 与 `usage_available`。无清理动作使用 debug，有状态变化使用 info，可恢复异常 warn、执行失败 error 并携带 error。
+- HTTP 结束摘要包括 method/path/route/status/latency_ms/client_ip/bytes/user_agent/request_id；查询串整体不记录，认证头、Cookie、token 与请求体也不记录。成功健康检查及前端资源降 debug；4xx warn、5xx error（含 panic）。`X-Request-Id` 沿用或生成回写，panic 日志不记录可能含凭据的 panic 内容；SSE/follow 连接在结束时记录。
+- 管理登录成功 info、失败 warn，不记录凭据；已认证管理写操作记录操作者、路由、状态与 request_id（token 认证仅以 `api_token` 标记身份）。
+
 ---
 
 ## 4. 任务取消与孤儿容器级联清理 (Anti-Zombie)

@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	logging "github.com/gzzchh/asu-go/internal/logcontext"
 	"go.uber.org/zap"
 	"golang.org/x/sync/singleflight"
 )
@@ -84,6 +85,7 @@ func (c *Cache) get(ctx context.Context, upstream, path string) ([]byte, error) 
 		sidecar, metaErr := os.ReadFile(file + ".meta.json")
 		valid := readErr == nil && metaErr == nil && json.Unmarshal(sidecar, &meta) == nil && meta.SHA256 == fmt.Sprintf("%x", sha256.Sum256(body))
 		if valid && time.Since(meta.FetchedAt) < c.TTL {
+			logging.OrNop(c.Logger).Debug("元数据缓存命中", zap.String("path", path))
 			return body, nil
 		}
 		if !valid {
@@ -91,6 +93,7 @@ func (c *Cache) get(ctx context.Context, upstream, path string) ([]byte, error) 
 		}
 		url := upstream + "/" + path
 		res, err := c.Client.Fetch(ctx, url, meta.ETag, meta.LastModified)
+		logging.OrNop(c.Logger).Debug("元数据拉取完成", zap.String("path", path), zap.Int("status", res.Status), zap.Error(err))
 		if err == nil {
 			switch res.Status {
 			case 200:
@@ -139,6 +142,7 @@ func (c *Cache) get(ctx context.Context, upstream, path string) ([]byte, error) 
 		if err != nil {
 			c.warn("元数据缓存写入失败", err, url)
 		}
+		logging.OrNop(c.Logger).Info("元数据缓存已刷新", zap.String("path", path), zap.Int("status", res.Status), zap.Int("bytes", len(body)))
 		return body, nil
 	})
 	select {

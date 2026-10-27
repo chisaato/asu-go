@@ -16,8 +16,10 @@ import (
 	"time"
 
 	"github.com/gzzchh/asu-go/internal/buildreq"
+	logging "github.com/gzzchh/asu-go/internal/logcontext"
 	"github.com/gzzchh/asu-go/internal/runner"
 	"github.com/gzzchh/asu-go/internal/store"
+	"go.uber.org/zap"
 )
 
 // ArtifactPublisher 是 store.Store 的发布子接口，便于注入失败测试。
@@ -147,7 +149,7 @@ func (q *SQLite) Complete(ctx context.Context, id string, result runner.Result, 
 	if runErr == nil {
 		if strings.HasPrefix(id, "rp_") {
 			// 诊断产物单独保存，不进入公开 store 命名空间。
-			runErr = (&store.Local{Dir: filepath.Join(q.Options.DataDir, "diagnostics")}).Publish(ctx, id, result.ArtifactDir)
+			runErr = (&store.Local{Dir: filepath.Join(q.Options.DataDir, "diagnostics"), Logger: q.Options.Logger}).Publish(ctx, id, result.ArtifactDir)
 		} else {
 			runErr = q.Publisher.Publish(ctx, id, result.ArtifactDir)
 		}
@@ -235,6 +237,18 @@ func (q *SQLite) Complete(ctx context.Context, id string, result runner.Result, 
 	}
 	if err = tx.Commit(); err != nil {
 		return err
+	}
+	logging.OrNop(q.Options.Logger).Debug("构建统计与结果已提交", zap.String("component", "stats"), zap.String("request_hash", id), zap.String("status", status), zap.Bool("counted", n == 1 && !strings.HasPrefix(id, "rp_")))
+	log := logging.OrNop(q.Options.Logger).With(zap.String("component", "queue"), zap.String("request_hash", id), zap.String("job_id", id), zap.String("status", status))
+	if runErr != nil {
+		cause := runErr
+		var failure *runner.Error
+		if errors.As(runErr, &failure) {
+			cause = failure.Cause
+		}
+		log.Error("作业结果已保存", zap.Error(cause))
+	} else {
+		log.Info("作业结果已保存")
 	}
 	q.Runner.Hub.Forget(id)
 	return nil
