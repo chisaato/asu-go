@@ -28,5 +28,12 @@ runtime:
   driver: docker
   # 容器内路径；由 compose.yaml 把宿主引擎 socket 挂到这里。Podman 同样使用 docker 驱动。
   socket: unix:///var/run/docker.sock
+runner:
+  verbose: true
+  cache:
+    enabled: true
+    # 默认 {data_dir}/cache。
+    dir: ""
+    max_size_gb: 20
 queue:
   max_concurrent_builds: 2

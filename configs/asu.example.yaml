@@ -60,6 +60,15 @@ runtime:
   # rolling 镜像到期强制复查；每次进程重启后首次使用也会复查。
   rolling_recheck: 6h
   scavenger_interval: 5m
+runner:
+  # 默认详细输出 make image；诊断请求的 verbose 仍可独立开启。
+  verbose: true
+  cache:
+    enabled: true
+    # 留空跟随 data_dir，使用 {data_dir}/cache；只存 apk/ipk，不存索引。
+    dir: ""
+    # 按文件 mtime 淘汰，0 表示下次 Cleaner 清空包缓存。
+    max_size_gb: 20
 metadata:
   refresh_interval: 1h
   cache_ttl: 1h

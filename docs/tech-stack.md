@@ -171,6 +171,8 @@ K8S 预留要点（现在就遵守，避免日后返工）：
 
 `cleaner.interval` 默认 10m，启动立即清理一次；`cleaner.orphan_grace` 默认 1h，仅回收无 jobs 记录的公开 hash 目录。普通产物按 expires_at，日志、任务记录和诊断产物按 purge_at 回收；活跃任务不回收。下载每次检查 jobs 的公开期限，不依赖定时清理。手动删除保留任务记录并标记 `result.artifacts_removed=true`，公开轮询/下载按过期返回 404。
 
+`runner.verbose` 默认 true，仅向 `make image` 添加 `V=s`（与任务显式 verbose 取或）。`runner.cache.enabled` 默认 true，`dir` 留空时延迟解析为 `{data_dir}/cache`，`max_size_gb` 默认 20、允许 0。缓存经 Runtime 的 put/get_archive 在任务私有 `WorkingDir/dl` 与共享包仓库之间复制，只保留非空普通 `.apk`/`.ipk`，索引从不跨任务共享。镜像引用去除 digest 并清洗为目录键；自定义 repositories 请求跳过缓存，失败构建不回收，缓存故障不阻断构建。Cleaner 共用 Cache 对象的进程内互斥，按播种时 touch 的文件 mtime LRU 淘汰；不支持多服务进程共享写同一目录。详见 [ADR 0005](adr/0005-package-cache.md) 与 [Runner 包缓存](runner-and-observability.md#36-跨任务包缓存)。
+
 ---
 
 ## 5. 前端（`web/`）

@@ -101,7 +101,8 @@ func runServe(parent context.Context, cfg config.Config) error {
 	if _, err := rt.Info(ctx); err != nil {
 		return err
 	}
-	buildRunner := &runner.Runner{Logger: logger, Runtime: rt, Hub: hub, JobTimeout: cfg.Queue.JobTimeout, RollingRecheck: cfg.Runtime.RollingRecheck}
+	packageCache := &runner.PackageCache{Enabled: cfg.Runner.Cache.Enabled, Dir: cfg.CacheDir(), MaxBytes: cfg.Runner.Cache.MaxSizeGB * (1 << 30), Logger: logger}
+	buildRunner := &runner.Runner{Logger: logger, Runtime: rt, Hub: hub, JobTimeout: cfg.Queue.JobTimeout, RollingRecheck: cfg.Runtime.RollingRecheck, Verbose: cfg.Runner.Verbose, Cache: packageCache}
 	jobs := queue.NewSQLite(database.DB, catalog, meta, buildRunner, queue.Options{
 		Logger: logger, DataDir: cfg.DataDir, MaxConcurrentBuilds: cfg.Queue.MaxConcurrentBuilds, MaxPendingJobs: cfg.Queue.MaxPendingJobs,
 		BuildTTL: cfg.Queue.BuildTTL, BuildUnversionedTTL: cfg.Queue.BuildUnversionedTTL, BuildDefaultsTTL: cfg.Queue.BuildDefaultsTTL, BuildFailureTTL: cfg.Queue.BuildFailureTTL, Retention: cfg.Diagnostics.Retention,
@@ -117,7 +118,7 @@ func runServe(parent context.Context, cfg config.Config) error {
 	for _, routes := range public {
 		api.RegisterStore(routes, artifactStore, jobs.StoreVisible)
 	}
-	cleaner := &queue.Cleaner{Jobs: jobs, Store: artifactStore, StoreDir: cfg.StoreDir(), Interval: cfg.Cleaner.Interval, OrphanGrace: cfg.Cleaner.OrphanGrace, Logger: logger.With(zap.String("component", "cleaner"))}
+	cleaner := &queue.Cleaner{Jobs: jobs, Store: artifactStore, StoreDir: cfg.StoreDir(), Interval: cfg.Cleaner.Interval, OrphanGrace: cfg.Cleaner.OrphanGrace, Logger: logger.With(zap.String("component", "cleaner")), PackageCache: packageCache}
 	admin.RegisterStore(adminGroup, cleaner)
 	admin.RegisterJobs(adminGroup, jobs)
 	for _, routes := range public {

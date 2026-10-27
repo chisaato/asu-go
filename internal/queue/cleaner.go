@@ -24,6 +24,7 @@ type Cleaner struct {
 	Interval, OrphanGrace time.Duration
 	Now                   func() time.Time
 	Logger                *zap.Logger
+	PackageCache          interface{ Sweep(context.Context) error }
 }
 
 func (c *Cleaner) now() time.Time {
@@ -85,6 +86,9 @@ func (c *Cleaner) removeArtifacts(ctx context.Context, id string) error {
 }
 
 func (c *Cleaner) Sweep(ctx context.Context) (err error) {
+	if c.PackageCache != nil {
+		c.warn("", c.PackageCache.Sweep(ctx))
+	}
 	c.Jobs.mu.Lock()
 	defer c.Jobs.mu.Unlock()
 	started := time.Now()
