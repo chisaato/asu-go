@@ -48,7 +48,7 @@ func TestPodmanImageBuilderSetup(t *testing.T) {
 				if err != nil {
 					return "", err
 				}
-				setup, _, ok := strings.Cut(script, "printf '%s\\n' '##asu:stage=validate_revision'\n")
+				setup, _, ok := strings.Cut(script, "stage validate_revision\n")
 				if !ok {
 					t.Fatal("缺少 make info 后阶段标记")
 				}

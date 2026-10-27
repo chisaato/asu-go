@@ -71,6 +71,8 @@ type Runner struct {
 	Hub            *stream.Hub
 	JobTimeout     time.Duration
 	RollingRecheck time.Duration
+	Verbose        bool
+	Cache          *PackageCache
 	// BuildScript 仅供受信任的组装层注入；nil 保持生产构建脚本。
 	BuildScript func(Job) (string, error)
 	pullMu      sync.Mutex
@@ -228,6 +230,7 @@ func (r *Runner) execute(parent context.Context, j Job, existing runtime.Handle)
 		}
 		j.WorkingDir = workingDir(metadata.WorkingDir)
 		j.inputUID, j.inputGID = archiveOwner(metadata.User, log)
+		j.Verbose = j.Verbose || r.Verbose
 		log.Info("构建镜像元数据", zap.String("image", j.Image), zap.String("working_dir", j.WorkingDir), zap.String("user", metadata.User))
 		buildScript := r.BuildScript
 		if buildScript == nil {
@@ -255,6 +258,11 @@ func (r *Runner) execute(parent context.Context, j Job, existing runtime.Handle)
 			return result, err
 		}
 		log.Debug("输入已注入", zap.String("operation", "put_archive"), zap.Int("bytes", len(archive)))
+		if r.Cache.usable(j) {
+			if cacheErr := r.Cache.seed(ctx, r.Runtime, result.Handle, j); cacheErr != nil {
+				log.Warn("包缓存播种失败，继续构建", zap.Error(cacheErr))
+			}
+		}
 		if err = r.Runtime.Start(ctx, result.Handle); err != nil {
 			return result, err
 		}
@@ -317,6 +325,11 @@ func (r *Runner) execute(parent context.Context, j Job, existing runtime.Handle)
 		return result, fmt.Errorf("取回产物: %w", err)
 	}
 	result.ArtifactDir = j.ArtifactDir
+	if r.Cache.usable(j) {
+		if cacheErr := r.Cache.collect(ctx, r.Runtime, result.Handle, j); cacheErr != nil {
+			log.Warn("包缓存回收失败，保留构建结果", zap.Error(cacheErr))
+		}
+	}
 	return result, nil
 }
 func validStage(name string) bool {

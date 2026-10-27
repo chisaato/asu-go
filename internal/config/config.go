@@ -32,6 +32,7 @@ type Config struct {
 	Cleaner     Cleaner     `yaml:"cleaner"`
 	Stats       Stats       `yaml:"stats"`
 	Runtime     Runtime     `yaml:"runtime"`
+	Runner      Runner      `yaml:"runner"`
 	Metadata    Metadata    `yaml:"metadata"`
 	Diagnostics Diagnostics `yaml:"diagnostics"`
 }
@@ -115,6 +116,25 @@ type Runtime struct {
 	PullPolicy        string        `yaml:"pull_policy"`
 }
 
+type Runner struct {
+	Verbose bool         `yaml:"verbose"`
+	Cache   PackageCache `yaml:"cache"`
+}
+
+type PackageCache struct {
+	Enabled   bool   `yaml:"enabled"`
+	Dir       string `yaml:"dir"`
+	MaxSizeGB int64  `yaml:"max_size_gb"`
+}
+
+// CacheDir 和 StoreDir 一样，在环境变量和 flag 覆盖后解析 data_dir。
+func (c Config) CacheDir() string {
+	if c.Runner.Cache.Dir != "" {
+		return c.Runner.Cache.Dir
+	}
+	return filepath.Join(c.DataDir, "cache")
+}
+
 type Metadata struct {
 	RefreshInterval time.Duration `yaml:"refresh_interval"`
 	CacheTTL        time.Duration `yaml:"cache_ttl"`
@@ -138,6 +158,7 @@ func Default() Config {
 		Cleaner:     Cleaner{Interval: 10 * time.Minute, OrphanGrace: time.Hour},
 		Stats:       Stats{Driver: "sqlite"},
 		Runtime:     Runtime{Driver: "docker", Socket: "unix:///var/run/docker.sock", PullPolicy: "missing", RollingRecheck: 6 * time.Hour, ScavengerInterval: 5 * time.Minute},
+		Runner:      Runner{Verbose: true, Cache: PackageCache{Enabled: true, MaxSizeGB: 20}},
 		Metadata:    Metadata{RefreshInterval: time.Hour, CacheTTL: time.Hour},
 		Diagnostics: Diagnostics{Retention: 7 * 24 * time.Hour, KeepContainerTTL: time.Hour, MaxKept: 3},
 	}
@@ -213,6 +234,12 @@ func Load(path string, flags Overrides) (Config, error) {
 }
 
 func (c Config) Validate() error {
+	if c.Runner.Cache.MaxSizeGB < 0 || c.Runner.Cache.MaxSizeGB > (1<<63-1)/(1<<30) {
+		return errors.New("runner.cache.max_size_gb: 必须为非负且可表示字节数的整数")
+	}
+	if strings.ContainsAny(c.Runner.Cache.Dir, "\x00\r\n") || c.Runner.Cache.Dir != "" && strings.TrimSpace(c.Runner.Cache.Dir) == "" {
+		return errors.New("runner.cache.dir: 必须为有效目录路径或空字符串")
+	}
 	if err := sources.ValidateDistribution(c.Server.DefaultDistro); err != nil {
 		return fmt.Errorf("server.default_distro: %w", err)
 	}

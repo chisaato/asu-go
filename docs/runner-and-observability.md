@@ -106,7 +106,8 @@ go func() {
 构建脚本在每个阶段前输出固定标记行：`##asu:stage=<name>`。Runner 解析后得到与原版 `X-Imagebuilder-Status` 一致的阶段值：`init`、`container_setup`、`validate_revision`、`validate_manifest`、`building_image`，并写入任务记录。标记行本身保留在日志中。不再用正则嗅探 ImageBuilder 的输出。
 
 ### 3.4 可观测性参数
-- `verbose=true` 时向 `make image` 注入 `V=s`，展示完整打包与安装过程。
+- `runner.verbose` 默认 true，与任务 `Verbose` 取或后向 `make image` 注入 `V=s`，展示完整打包与安装过程；关闭全局默认不影响诊断请求显式开启。`make info` / `make manifest` 不加 `V=s`。
+- 每次阶段切换前输出 `##asu:timing=<上一阶段名> <整数秒>`，退出时也记录最后阶段耗时；只认 `##asu:stage=` 的消费者不会将 timing 或未知 `##asu:` 行误判为阶段，原始行仍保留于构建日志。make 前信息头包括镜像、profile、请求包和播种包数（不等同于最终实际使用包数）。
 - 阶段事件（`event: stage`）与 SSE 随管理后台二期实现；一期只提供 follow 式纯文本日志 `GET /admin/api/jobs/{hash}/log?follow=1`。
 
 ### 3.5 应用日志（Zap）
@@ -119,6 +120,16 @@ go func() {
 - 重启接管记录任务、句柄与 `replayed_lines`；scavenger 每轮记录 `found` / `removed`；TTL cleaner 记录删除数量、公开 store/诊断产物/日志的 `freed_bytes` 与 `usage_available`。无清理动作使用 debug，有状态变化使用 info，可恢复异常 warn、执行失败 error 并携带 error。
 - HTTP 结束摘要包括 method/path/route/status/latency_ms/client_ip/bytes/user_agent/request_id；查询串整体不记录，认证头、Cookie、token 与请求体也不记录。成功健康检查及前端资源降 debug；4xx warn、5xx error（含 panic）。`X-Request-Id` 沿用或生成回写，panic 日志不记录可能含凭据的 panic 内容；SSE/follow 连接在结束时记录。
 - 管理登录成功 info、失败 warn，不记录凭据；已认证管理写操作记录操作者、路由、状态与 request_id（token 认证仅以 `api_token` 标记身份）。
+
+### 3.6 跨任务包缓存
+
+`runner.cache.enabled` 默认 true，目录默认为 `{data_dir}/cache`，`max_size_gb` 默认 20（GiB）。覆盖 `dir` 时必须使用专用缓存目录，不要指向产物目录或其他业务数据。每个镜像引用去除 digest 后，将非 `[a-z0-9._-]` 字符替换成 `_`，形成独立目录；不共享镜像 WORKDIR、`packages`、`build_dir` 或 `tmp`。
+
+Create 后、Start 前以 put_archive 向镜像 WorkingDir 注入私有 `dl/` 和包副本，tar 的目录和文件沿用镜像用户 uid/gid。共享仓库只保存普通、非空 `.apk` / `.ipk`，绝不播种或回收 APKINDEX、Packages、签名及其他索引；新容器自行获取新索引。成功取回固件后 get_archive `WorkingDir/dl`，过滤根目录后拒绝嵌套路径、穿越、链接和非包文件，以同目录临时文件加 rename 原子发布；同名已有文件不覆盖。失败构建不回收。
+
+自定义 repositories 请求及 disabled 均跳过播种和回收；播种或回收异常仅 warn，不改变构建结果。共享 Runner Cache 对象通过进程内互斥串行保护播种、回收与淘汰，不支持多个服务进程同时写同一缓存目录。重启接管只有句柄、没有可信原始镜像/仓库信息时保守跳过缓存回收。
+
+Cleaner 在现有周期内扫描包文件总大小，超限按 mtime 从旧到新删除；播种成功 touch 被播种文件，因此是文件级近似 LRU。`max_size_gb: 0` 表示下轮清空包文件，不是无限容量；周期之间可能暂时超过上限。Zap 记录播种/新增包数和字节数、淘汰数，debug 记录 `disabled` / `custom_repos` 跳过原因。缓存只是可重新下载的性能优化，不代替 ImageBuilder 的包完整性和签名校验。
 
 ---
 
