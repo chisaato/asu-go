@@ -2,6 +2,8 @@
 
 本文档定义 ASU-Go 内置管理控制台（Web Admin Dashboard）的设计方案。后台直接集成在单一 Go 二进制内，访问 `http://<server-ip>:8000/admin` 即可直达。
 
+> 前端页面、组件与接口契约的实现规格见 [admin-ui.md](admin-ui.md)。
+
 ---
 
 ## 1. 核心定位与设计目标
