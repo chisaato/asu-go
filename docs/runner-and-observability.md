@@ -96,8 +96,8 @@ go func() {
 ### 3.2 构建容器执行流程（取代原版 sleep + exec）
 原版：容器主进程为 `sleep`，输入用 `put_archive`，所有步骤走 `exec_run`，产物用 `get_archive`，构建容器没有宿主 bind mount。ASU-Go 保留 put/get_archive 思路，仅把 exec 改为主进程：
 
-1. `create`：不设 AutoRemove，不挂载任何宿主路径；沿用原版安全设置（`cap_drop=all`、`no_new_privileges`、非特权）与独立网络 `asu-build`（不存在则自动创建）；打 label `managed-by=asu-go`、`asu.request_hash=<hash>`。
-2. `put_archive`：在 `start` 之前注入 defaults 脚本（`asu-files/etc/uci-defaults/99-asu-defaults`）、repositories（apk 为 `repositories`，opkg 为 `repositories.conf`，按镜像内文件检测）、公钥。
+1. `prepare` 后通过 `Runtime.InspectImage` 读取镜像 `WorkingDir` 与 `User`；元数据按镜像名缓存在 Runner 进程内，显式 always 拉取（含 rolling 复查）后刷新。工作目录去掉尾随 `/`（根目录保留 `/`），空值回退 `/builder`；OpenWrt 通常是 `/builder`，ImmortalWrt 通常是 `/home/build/immortalwrt`，不按发行版硬编码。`create` 的 WorkingDir、脚本中的 BIN_DIR/FILES、manifest、归档注入和产物回收全部使用这一目录。info 日志记录 `component=runner`、`image`、`working_dir`、`user`。
+2. `create`：不覆盖镜像默认运行用户，不设 AutoRemove，不挂载任何宿主路径；沿用原版安全设置（`cap_drop=all`、`no_new_privileges`、非特权）与独立网络 `asu-build`（不存在则自动创建）；打 label `managed-by=asu-go`、`asu.request_hash=<hash>`。`put_archive` 在 `start` 之前注入 defaults 脚本（`asu-files/etc/uci-defaults/99-asu-defaults`）、repositories（apk 为 `repositories`，opkg 为 `repositories.conf`，按镜像内文件检测）、公钥。tar 文件和全部父目录显式设置 uid/gid：数字 `uid:gid` 原样使用，单独 uid 的 gid 取同值，空 User 为 root；用户名或无法推断时回退 `1000:1000` 并记 warn（不在宿主解析镜像用户名）。
 3. `start`：主进程为构建脚本，依次执行 `make info`、`make manifest`、`make image`。构建输出目录位于容器自身可写层（原版的 tmpfs 在容器退出后 `get_archive` 读不到）。
 4. `logs?follow=1`：Runner 流式读取并解析阶段标记。
 5. `wait` 取退出码；`get_archive` 取回产物（容器已退出也可取）；落盘成功后删除容器。
@@ -132,6 +132,7 @@ ASU-Go 引入三重防护：
 2. **重启接管 (Takeover)**：
    服务启动时，对数据库中状态为 `running` 的任务，用 `Handle` 查询容器：
    - 容器仍在运行：重新 `logs?follow=1&timestamps=1` **从头**读取，重建 RingBuffer 并覆写磁盘日志文件（容器日志是权威来源，因此不丢行、不重复），然后继续走正常的 wait / 取产物 / 清理流程。
+   - 接管产物路径使用 `Runtime.Inspect` 返回的容器实际 WorkingDir，不重新拉取镜像，也不受同名镜像标签后来变更影响；诊断重放作为新任务重新查询镜像，scavenger 不依赖构建目录。
    - 容器已退出：同样从日志补读，再收尾。
    - 容器不存在：任务标记为 `failed`（`detail: interrupted`）。
    - 前提：容器日志驱动必须可读（json-file / k8s-file / journald），启动时检查，`none` 则拒绝启动。

@@ -11,6 +11,7 @@ import (
 // Handle 是可持久化的不透明值，只能保存、恢复并传回驱动。
 type Handle string
 type ImageSpec struct{ Reference, PullPolicy string }
+type ImageMetadata struct{ WorkingDir, User string }
 type RunSpec struct {
 	Image                         string
 	Command, Env                  []string
@@ -28,6 +29,7 @@ type Info struct{ Name, Version, LoggingDriver string }
 // State 不暴露引擎状态对象；Exists=false 表示句柄对应资源已消失。
 type State struct {
 	Handle                Handle
+	WorkingDir            string
 	Exists, Running       bool
 	Labels                map[string]string
 	CreatedAt, FinishedAt time.Time
@@ -43,6 +45,7 @@ type Options struct {
 }
 type Runtime interface {
 	Prepare(context.Context, ImageSpec) error
+	InspectImage(context.Context, string) (ImageMetadata, error)
 	// Create 分配环境，允许在 Start 前注入输入。
 	Create(context.Context, RunSpec) (Handle, error)
 	PutArchive(context.Context, Handle, string, io.Reader) error

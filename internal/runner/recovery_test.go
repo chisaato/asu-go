@@ -195,23 +195,23 @@ func (r *prepareRuntime) Prepare(_ context.Context, s runtime.ImageSpec) error {
 	return r.err
 }
 func TestRollingRecheck(t *testing.T) {
-	rt := &prepareRuntime{}
+	rt := &prepareRuntime{Runtime: runtime.NewFake()}
 	r := &Runner{Runtime: rt, RollingRecheck: time.Hour}
 	j := Job{Image: "rolling", Rolling: true, PullPolicy: "missing"}
 	ctx := context.Background()
-	if err := r.prepare(ctx, j); err != nil {
+	if _, err := r.prepare(ctx, j); err != nil {
 		t.Fatal(err)
 	}
-	if err := r.prepare(ctx, j); err != nil {
+	if _, err := r.prepare(ctx, j); err != nil {
 		t.Fatal(err)
 	}
 	r.checked[j.Image] = time.Now().Add(-2 * time.Hour)
-	if err := r.prepare(ctx, j); err != nil {
+	if _, err := r.prepare(ctx, j); err != nil {
 		t.Fatal(err)
 	}
 	j.Rolling = false
 	j.PullPolicy = "never"
-	if err := r.prepare(ctx, j); err != nil {
+	if _, err := r.prepare(ctx, j); err != nil {
 		t.Fatal(err)
 	}
 	if !reflect.DeepEqual(rt.policies, []string{"always", "missing", "always", "never"}) {
@@ -221,14 +221,14 @@ func TestRollingRecheck(t *testing.T) {
 	r2 := &Runner{Runtime: rt}
 	j.Rolling = true
 	rt.err = errors.New("pull failed")
-	if err := r2.prepare(ctx, j); err == nil {
+	if _, err := r2.prepare(ctx, j); err == nil {
 		t.Fatal("拉取错误被吞掉")
 	}
 	if !r2.checked[j.Image].IsZero() {
 		t.Fatal(r2.checked)
 	}
 	rt.err = nil
-	if err := r2.prepare(ctx, j); err != nil || rt.policies[len(rt.policies)-1] != "always" {
+	if _, err := r2.prepare(ctx, j); err != nil || rt.policies[len(rt.policies)-1] != "always" {
 		t.Fatal(err, rt.policies)
 	}
 }

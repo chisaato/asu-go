@@ -27,6 +27,10 @@ func TestLifecycleApplicationLogs(t *testing.T) {
 	if logs.FilterMessage("构建阶段变化").Len() != 2 || logs.FilterMessage("作业开始").Len() != 1 || logs.FilterMessage("作业完成").Len() != 1 {
 		t.Fatal(logs.All())
 	}
+	metadata := logs.FilterMessage("构建镜像元数据").All()
+	if len(metadata) != 1 || metadata[0].Level != zapcore.InfoLevel || metadata[0].ContextMap()["image"] != j.Image || metadata[0].ContextMap()["working_dir"] != "/builder" || metadata[0].ContextMap()["user"] != "" {
+		t.Fatal("缺少镜像元数据 info 日志", metadata)
+	}
 	for _, entry := range logs.All() {
 		if entry.ContextMap()["component"] != "runner" || entry.ContextMap()["request_hash"] != j.ID {
 			t.Fatal(entry)

@@ -99,6 +99,8 @@ asu version
 type Runtime interface {
     // Prepare 确保构建镜像可用（拉取 / 校验）。
     Prepare(ctx context.Context, spec ImageSpec) error
+    // InspectImage 读取镜像默认工作目录与用户，供构建目录与归档属主推断。
+    InspectImage(ctx context.Context, image string) (ImageMetadata, error)
     // Create 分配环境，返回可持久化的不透明句柄。
     Create(ctx context.Context, spec RunSpec) (Handle, error)
     // PutArchive 在启动前注入 tar 文件流，无宿主路径依赖。

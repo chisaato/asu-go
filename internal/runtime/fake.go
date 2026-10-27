@@ -20,10 +20,11 @@ type FakePlan struct {
 
 // Fake 不产生后台协程；等待由调用方的 context 或 Kill 中断。
 type Fake struct {
-	mu   sync.Mutex
-	Next FakePlan
-	jobs map[Handle]*fakeJob
-	seq  int
+	mu     sync.Mutex
+	Next   FakePlan
+	Images map[string]ImageMetadata
+	jobs   map[Handle]*fakeJob
+	seq    int
 }
 type fakeJob struct {
 	spec              RunSpec
@@ -37,6 +38,11 @@ type fakeJob struct {
 
 func NewFake() *Fake                                           { return &Fake{jobs: make(map[Handle]*fakeJob)} }
 func (f *Fake) Prepare(ctx context.Context, _ ImageSpec) error { return ctx.Err() }
+func (f *Fake) InspectImage(ctx context.Context, image string) (ImageMetadata, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.Images[image], ctx.Err()
+}
 func (f *Fake) Info(ctx context.Context) (Info, error) {
 	return Info{Name: "fake", Version: "1", LoggingDriver: "memory"}, ctx.Err()
 }
@@ -222,7 +228,7 @@ var _ Runtime = (*Fake)(nil)
 var _ Runtime = (*engine)(nil)
 
 func (f *Fake) state(h Handle, j *fakeJob) State {
-	s := State{Handle: h, Exists: true, CreatedAt: j.created, FinishedAt: j.finished,
+	s := State{Handle: h, Exists: true, WorkingDir: j.spec.WorkingDir, CreatedAt: j.created, FinishedAt: j.finished,
 		Labels: map[string]string{"managed-by": "asu-go", "asu.request_hash": j.spec.RequestHash}}
 	if j.spec.KeepContainer {
 		s.Labels["asu.keep_container"] = "true"

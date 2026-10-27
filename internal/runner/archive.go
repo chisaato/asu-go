@@ -10,12 +10,31 @@ import (
 	"os"
 	"path"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/gzzchh/asu-go/internal/runtime"
 	"go.uber.org/zap"
 )
+
+// 不在宿主解析镜像用户名；保留镜像默认运行用户，仅为注入文件推断属主。
+func archiveOwner(user string, log *zap.Logger) (int, int) {
+	if user == "" {
+		return 0, 0
+	}
+	uidText, gidText, hasGroup := strings.Cut(user, ":")
+	uid, uidErr := strconv.ParseUint(uidText, 10, 32)
+	gid, gidErr := uid, uidErr
+	if hasGroup {
+		gid, gidErr = strconv.ParseUint(gidText, 10, 32)
+	}
+	if uidErr == nil && gidErr == nil {
+		return int(uid), int(gid)
+	}
+	log.Warn("无法从镜像用户推断归档属主，回退 1000:1000", zap.String("user", user), zap.Int("uid", 1000), zap.Int("gid", 1000))
+	return 1000, 1000
+}
 
 func inputs(j Job) ([]byte, error) {
 	files := map[string]string{}
@@ -72,7 +91,7 @@ func inputs(j Job) ([]byte, error) {
 			}
 			prefix = path.Join(prefix, part)
 			if !dirs[prefix] {
-				if err := tw.WriteHeader(&tar.Header{Name: prefix + "/", Typeflag: tar.TypeDir, Mode: 0755}); err != nil {
+				if err := tw.WriteHeader(&tar.Header{Name: prefix + "/", Typeflag: tar.TypeDir, Mode: 0755, Uid: j.inputUID, Gid: j.inputGID}); err != nil {
 					return nil, err
 				}
 				dirs[prefix] = true
@@ -83,7 +102,7 @@ func inputs(j Job) ([]byte, error) {
 		if strings.HasPrefix(name, "asu-files/") {
 			mode = 0755
 		}
-		if err := tw.WriteHeader(&tar.Header{Name: name, Mode: mode, Size: int64(len(data))}); err != nil {
+		if err := tw.WriteHeader(&tar.Header{Name: name, Mode: mode, Size: int64(len(data)), Uid: j.inputUID, Gid: j.inputGID}); err != nil {
 			return nil, err
 		}
 		if _, err := io.WriteString(tw, data); err != nil {

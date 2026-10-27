@@ -209,6 +209,17 @@ func (e *engine) Create(ctx context.Context, spec RunSpec) (h Handle, err error)
 	})
 	return Handle(r.ID), err
 }
+func (e *engine) InspectImage(ctx context.Context, image string) (metadata ImageMetadata, err error) {
+	defer func(done func(error)) { done(err) }(e.operation("inspect_image", zap.String("image", image)))
+	r, err := e.client.ImageInspect(ctx, image)
+	if err != nil {
+		return ImageMetadata{}, err
+	}
+	if r.Config != nil {
+		metadata = ImageMetadata{WorkingDir: r.Config.WorkingDir, User: r.Config.User}
+	}
+	return metadata, nil
+}
 func (e *engine) Start(ctx context.Context, h Handle) (err error) {
 	defer func(done func(error)) { done(err) }(e.operation("start", zap.String("container", string(h))))
 	_, err = e.client.ContainerStart(ctx, string(h), client.ContainerStartOptions{})
@@ -278,7 +289,7 @@ func (e *engine) Inspect(ctx context.Context, h Handle) (state State, err error)
 	if err != nil {
 		return State{}, err
 	}
-	s := State{Handle: h, Exists: true, Labels: r.Container.Config.Labels}
+	s := State{Handle: h, Exists: true, WorkingDir: r.Container.Config.WorkingDir, Labels: r.Container.Config.Labels}
 	s.CreatedAt, _ = time.Parse(time.RFC3339Nano, r.Container.Created)
 	if r.Container.State != nil {
 		s.Running = r.Container.State.Running

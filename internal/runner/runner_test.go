@@ -20,10 +20,11 @@ import (
 
 type observedRuntime struct {
 	runtime.Runtime
-	calls  []string
-	spec   runtime.RunSpec
-	input  []byte
-	inject []byte
+	calls            []string
+	spec             runtime.RunSpec
+	input            []byte
+	inject           []byte
+	putPath, getPath string
 }
 
 func (r *observedRuntime) Create(ctx context.Context, s runtime.RunSpec) (runtime.Handle, error) {
@@ -33,6 +34,7 @@ func (r *observedRuntime) Create(ctx context.Context, s runtime.RunSpec) (runtim
 }
 func (r *observedRuntime) PutArchive(ctx context.Context, h runtime.Handle, p string, reader io.Reader) error {
 	r.calls = append(r.calls, "put")
+	r.putPath = p
 	data, err := io.ReadAll(reader)
 	if err != nil {
 		return err
@@ -63,6 +65,7 @@ func (r *observedRuntime) Wait(ctx context.Context, h runtime.Handle) (runtime.E
 }
 func (r *observedRuntime) GetArchive(ctx context.Context, h runtime.Handle, p string) (io.ReadCloser, error) {
 	r.calls = append(r.calls, "get")
+	r.getPath = p
 	return r.Runtime.GetArchive(ctx, h, p)
 }
 func (r *observedRuntime) Kill(ctx context.Context, h runtime.Handle) error {

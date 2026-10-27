@@ -2,15 +2,23 @@ package runner
 
 import (
 	"fmt"
+	"path"
 	"sort"
 	"strings"
 )
 
 func quote(s string) string { return "'" + strings.ReplaceAll(s, "'", "'\"'\"'") + "'" }
 
+func workingDir(dir string) string {
+	if dir == "" {
+		return "/builder"
+	}
+	return path.Clean(dir)
+}
+
 // Script 将所有请求值作为单个 shell 参数传递；调用方负责包选择、仓库 allow-list 等业务校验。
 func Script(j Job) (string, error) {
-	values := []string{j.ID, j.Image, j.Profile, j.VersionCode, j.Defaults, j.Filesystem}
+	values := []string{j.ID, j.Image, j.Profile, j.VersionCode, j.Defaults, j.Filesystem, j.WorkingDir}
 	values = append(values, j.Packages...)
 	for k, v := range j.PackageVersions {
 		values = append(values, k, v)
@@ -61,10 +69,10 @@ func Script(j Job) (string, error) {
 	// 原版使用排序、去重后包名的空格连接字符串（无末尾换行）计算 sha256。
 	b.WriteString("names=$(awk '{sub(/^\\+/,\"\",$1); print $1}' .asu-manifest | LC_ALL=C sort -u | tr '\\n' ' '); names=${names% }; hash=$(printf '%s' \"$names\" | sha256sum); hash=${hash%% *}\n")
 	b.WriteString("printf '%s\\n' '##asu:stage=building_image'\n")
-	bin := "/builder/" + j.ID
+	bin := path.Join(workingDir(j.WorkingDir), j.ID)
 	b.WriteString("mkdir -p " + quote(bin) + "\nmake image" + common + " \"EXTRA_IMAGE_NAME=$(printf '%.12s' \"$hash\")\" " + quote("BIN_DIR="+bin))
 	if j.Defaults != "" {
-		b.WriteString(" 'FILES=/builder/asu-files'")
+		b.WriteString(" " + quote("FILES="+path.Join(workingDir(j.WorkingDir), "asu-files")))
 	}
 	if j.RootFSSizeMB > 0 {
 		fmt.Fprintf(&b, " ROOTFS_PARTSIZE=%d", j.RootFSSizeMB)

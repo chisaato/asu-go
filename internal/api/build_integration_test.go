@@ -31,15 +31,17 @@ func TestPodmanBuildSubmitPoll(t *testing.T) {
 	// 只在测试中注入小脚本；生产仍使用 Runner.Script 与 ImageBuilder。
 	h.q.Runner.BuildScript = func(j runner.Job) (string, error) {
 		return fmt.Sprintf(`set -eu
+# Alpine 测试夹具根目录默认只读；模拟 ImageBuilder 的可写工作目录。
+chmod u+w .
 echo '##asu:stage=container_setup'
 echo '##asu:stage=validate_manifest'
 echo '##asu:stage=building_image'
 sleep 1
-mkdir -p /builder/%s
-printf 'firmware' > /builder/%s/firmware.bin
-printf 'base - 1\nluci - 2\n' > /builder/%s/manifest
-printf 'base luci\n' > /builder/%s/build_cmd_packages
-printf '%%s' '{"source_date_epoch":1700000000,"profiles":{"generic":{"images":[{"name":"firmware.bin","type":"sysupgrade"}]}}}' > /builder/%s/profiles.json
+mkdir -p ./%s
+printf 'firmware' > ./%s/firmware.bin
+printf 'base - 1\nluci - 2\n' > ./%s/manifest
+printf 'base luci\n' > ./%s/build_cmd_packages
+printf '%%s' '{"source_date_epoch":1700000000,"profiles":{"generic":{"images":[{"name":"firmware.bin","type":"sysupgrade"}]}}}' > ./%s/profiles.json
 `, j.ID, j.ID, j.ID, j.ID, j.ID), nil
 	}
 	h.start()

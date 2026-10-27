@@ -3,10 +3,13 @@
 package runner
 
 import (
+	"archive/tar"
 	"bufio"
+	"bytes"
 	"context"
 	"errors"
 	"os"
+	"path"
 	"path/filepath"
 	"reflect"
 	"strings"
@@ -17,6 +20,59 @@ import (
 	"github.com/gzzchh/asu-go/internal/stream"
 	"golang.org/x/sync/errgroup"
 )
+
+// 真实 ImageBuilder 只跑 setup 与 make info，不下载包、不生成固件。
+func TestPodmanImageBuilderSetup(t *testing.T) {
+	socket := os.Getenv("ASU_TEST_RUNTIME_SOCKET")
+	if socket == "" {
+		socket = "unix:///var/run/docker.sock"
+	}
+	rt, err := runtime.Open("podman", runtime.Options{Socket: socket, PullPolicy: "never"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = rt.Close() }()
+	for _, image := range []string{
+		"ghcr.io/openwrt/imagebuilder:mediatek-filogic-v25.12.6",
+		"docker.io/immortalwrt/imagebuilder:mediatek-filogic-openwrt-25.12.2",
+	} {
+		t.Run(image, func(t *testing.T) {
+			hub, err := stream.NewHub(t.TempDir(), 100)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer func() { _ = hub.Close() }()
+			r := &Runner{Runtime: rt, Hub: hub, JobTimeout: 2 * time.Minute}
+			r.BuildScript = func(j Job) (string, error) {
+				script, err := Script(j)
+				if err != nil {
+					return "", err
+				}
+				setup, _, ok := strings.Cut(script, "printf '%s\\n' '##asu:stage=validate_revision'\n")
+				if !ok {
+					t.Fatal("缺少 make info 后阶段标记")
+				}
+				// 验证注入目录和文件均归构建用户可写，而非仅可读。
+				setup += "test -w asu-files/etc/uci-defaults\ntest -w asu-files/etc/uci-defaults/99-asu-defaults\ntest -w keys\ntest -w keys/custom-0.pem\nprintf test > asu-files/etc/uci-defaults/write-test\n"
+				setup += "mkdir -p " + quote(path.Join(j.WorkingDir, j.ID)) + "\ncp .asu-info " + quote(path.Join(j.WorkingDir, j.ID, "info.txt")) + "\nprintf '%s\\n' '##asu:stage=validate_revision'\n"
+				return setup, nil
+			}
+			j := Job{ID: "imagebuilder-setup", Image: image, ArtifactDir: t.TempDir(), PullPolicy: "never", Defaults: "#!/bin/sh\necho test\n", Repositories: map[string]string{"custom": "https://example.invalid/repo"}, RepositoriesMode: "replace", RepositoryKeys: []string{"-----BEGIN PUBLIC KEY-----\ntest"}}
+			result, err := r.Run(context.Background(), j)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if result.ExitCode != 0 || len(result.Stages) != 3 || result.Stages[2].Name != "validate_revision" {
+				t.Fatal(result)
+			}
+			info, err := os.ReadFile(filepath.Join(j.ArtifactDir, "info.txt"))
+			if err != nil || !strings.Contains(string(info), "Current Revision:") {
+				t.Fatal("未取回真实 make info 输出", string(info), err)
+			}
+			t.Log("setup、FIFO、仓库写入、defaults/keys 写权限、make info 与 get_archive 均通过")
+		})
+	}
+}
 
 func TestPodmanTakeoverAndScavenge(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 40*time.Second)
@@ -44,7 +100,7 @@ func TestPodmanTakeoverAndScavenge(t *testing.T) {
 	if err := first.Runtime.Prepare(ctx, runtime.ImageSpec{Reference: j.Image}); err != nil {
 		t.Fatal(err)
 	}
-	h, err := first.Runtime.Create(ctx, runtime.RunSpec{Image: j.Image, WorkingDir: "/builder", RequestHash: j.ID, Command: []string{"sh", "-ec", "echo first; sleep 2; echo second; sleep 1; mkdir -p /builder/takeover-integration; echo artifact > /builder/takeover-integration/firmware.bin; echo last"}})
+	h, err := first.Runtime.Create(ctx, runtime.RunSpec{Image: j.Image, WorkingDir: "/tmp/asu-takeover", RequestHash: j.ID, Command: []string{"sh", "-ec", "echo first; sleep 2; echo second; sleep 1; mkdir -p takeover-integration; echo artifact > takeover-integration/firmware.bin; echo last"}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -163,6 +219,30 @@ image)
 esac
 `
 
+func fakeMakeArchive(t *testing.T) []byte {
+	t.Helper()
+	var buf bytes.Buffer
+	tw := tar.NewWriter(&buf)
+	// Alpine 的 WorkingDir=/ 且根目录为 0555；测试夹具模拟可写 ImageBuilder 目录。
+	for _, hdr := range []*tar.Header{
+		{Name: ".", Typeflag: tar.TypeDir, Mode: 0755},
+		{Name: "make", Mode: 0755, Size: int64(len(fakeMake))},
+	} {
+		if err := tw.WriteHeader(hdr); err != nil {
+			t.Fatal(err)
+		}
+		if hdr.Name == "make" {
+			if _, err := tw.Write([]byte(fakeMake)); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	if err := tw.Close(); err != nil {
+		t.Fatal(err)
+	}
+	return buf.Bytes()
+}
+
 func TestPodmanRunner(t *testing.T) {
 	socket := os.Getenv("ASU_TEST_RUNTIME_SOCKET")
 	if socket == "" {
@@ -184,9 +264,18 @@ func TestPodmanRunner(t *testing.T) {
 				t.Fatal(err)
 			}
 			defer func() { _ = h.Close() }()
-			observed := &observedRuntime{Runtime: rt, inject: tarData(t, "make", fakeMake, 0)}
+			observed := &observedRuntime{Runtime: rt, inject: fakeMakeArchive(t)}
 			r := Runner{Runtime: observed, Hub: h, JobTimeout: 20 * time.Second}
-			j := Job{ID: "runner-integration-" + name, Image: "docker.io/library/alpine:latest", Profile: "test", VersionCode: "r-test", PackageVersions: map[string]string{"base": "1.0"}, ArtifactDir: t.TempDir(), Env: []string{"PATH=/builder:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"}}
+			image := "docker.io/library/alpine:latest"
+			if err := rt.Prepare(context.Background(), runtime.ImageSpec{Reference: image}); err != nil {
+				t.Fatal(err)
+			}
+			metadata, err := rt.InspectImage(context.Background(), image)
+			if err != nil {
+				t.Fatal(err)
+			}
+			dir := workingDir(metadata.WorkingDir)
+			j := Job{ID: "runner-integration-" + name, Image: image, Profile: "test", VersionCode: "r-test", PackageVersions: map[string]string{"base": "1.0"}, ArtifactDir: t.TempDir(), Env: []string{"PATH=" + dir + ":/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"}}
 			if name == "success" {
 				j.Defaults = "#!/bin/sh\necho test\n"
 				j.Repositories = map[string]string{"custom": "https://example.com/repo"}
@@ -246,7 +335,7 @@ func TestPodmanRunner(t *testing.T) {
 					t.Fatal(names)
 				}
 				tail := strings.Join(h.Tail(j.ID), "")
-				for _, want := range []string{"FILES=/builder/asu-files", "ROOTFS_PARTSIZE=123", "V=s"} {
+				for _, want := range []string{"FILES=" + path.Join(dir, "asu-files"), "ROOTFS_PARTSIZE=123", "V=s"} {
 					if !strings.Contains(tail, want) {
 						t.Fatal("缺少构建参数", want, tail)
 					}

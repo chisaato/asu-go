@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"path"
 	"strings"
 	"sync"
 	"time"
@@ -24,19 +25,22 @@ type Stage struct {
 type Job struct {
 	Distribution, Version, Target   string
 	ID, Image, Profile, VersionCode string
-	Packages                        []string
-	PackageVersions                 map[string]string
-	Defaults                        string
-	Repositories                    map[string]string
-	RepositoriesMode                string
-	RepositoryKeys                  []string
-	RootFSSizeMB                    int
-	Filesystem                      string
-	DiffPackages                    bool
-	Verbose, KeepContainer, Setup   bool
-	PullPolicy                      string
-	Rolling                         bool
-	Env                             []string
+	// WorkingDir 由 Runner 从镜像或接管容器元数据填入，不接受公开请求覆盖。
+	WorkingDir                    string
+	inputUID, inputGID            int
+	Packages                      []string
+	PackageVersions               map[string]string
+	Defaults                      string
+	Repositories                  map[string]string
+	RepositoriesMode              string
+	RepositoryKeys                []string
+	RootFSSizeMB                  int
+	Filesystem                    string
+	DiffPackages                  bool
+	Verbose, KeepContainer, Setup bool
+	PullPolicy                    string
+	Rolling                       bool
+	Env                           []string
 	// ArtifactDir 由调用方提供，建议为空的任务专属临时目录。
 	ArtifactDir string
 	// OnHandle 必须同步持久化句柄；失败会终止执行并清理。
@@ -71,6 +75,7 @@ type Runner struct {
 	BuildScript func(Job) (string, error)
 	pullMu      sync.Mutex
 	checked     map[string]time.Time
+	images      map[string]runtime.ImageMetadata
 }
 
 func (r *Runner) Run(parent context.Context, j Job) (result Result, err error) {
@@ -95,13 +100,11 @@ func (r *Runner) Resume(parent context.Context, j Job, h runtime.Handle) (Result
 		logging.OrNop(r.Logger).Warn("接管环境已不存在", zap.String("component", "runner"), zap.String("request_hash", j.ID), zap.String("container", string(h)), zap.Error(errors.New("interrupted")))
 		return Result{Handle: h, ExitCode: -1}, &Error{Kind: "interrupted", ExitCode: -1, Cause: errors.New("interrupted")}
 	}
+	j.WorkingDir = workingDir(s.WorkingDir)
 	return r.execute(parent, j, h)
 }
 
-func (r *Runner) prepare(ctx context.Context, j Job) error {
-	if !j.Rolling {
-		return r.Runtime.Prepare(ctx, runtime.ImageSpec{Reference: j.Image, PullPolicy: j.PullPolicy})
-	}
+func (r *Runner) prepare(ctx context.Context, j Job) (runtime.ImageMetadata, error) {
 	r.pullMu.Lock()
 	defer r.pullMu.Unlock()
 	interval := r.RollingRecheck
@@ -110,11 +113,11 @@ func (r *Runner) prepare(ctx context.Context, j Job) error {
 	}
 	policy := j.PullPolicy
 	last := r.checked[j.Image]
-	if last.IsZero() || time.Since(last) >= interval {
+	if j.Rolling && (last.IsZero() || time.Since(last) >= interval) {
 		policy = "always"
 	}
 	if err := r.Runtime.Prepare(ctx, runtime.ImageSpec{Reference: j.Image, PullPolicy: policy}); err != nil {
-		return err
+		return runtime.ImageMetadata{}, err
 	}
 	if r.checked == nil {
 		r.checked = make(map[string]time.Time)
@@ -122,7 +125,19 @@ func (r *Runner) prepare(ctx context.Context, j Job) error {
 	if policy == "always" {
 		r.checked[j.Image] = time.Now()
 	}
-	return nil
+	metadata, ok := r.images[j.Image]
+	if !ok || policy == "always" {
+		var err error
+		metadata, err = r.Runtime.InspectImage(ctx, j.Image)
+		if err != nil {
+			return runtime.ImageMetadata{}, err
+		}
+		if r.images == nil {
+			r.images = make(map[string]runtime.ImageMetadata)
+		}
+		r.images[j.Image] = metadata
+	}
+	return metadata, nil
 }
 
 func (r *Runner) execute(parent context.Context, j Job, existing runtime.Handle) (result Result, err error) {
@@ -207,6 +222,13 @@ func (r *Runner) execute(parent context.Context, j Job, existing runtime.Handle)
 		}
 	}()
 	if existing == "" {
+		metadata, prepareErr := r.prepare(ctx, j)
+		if prepareErr != nil {
+			return result, prepareErr
+		}
+		j.WorkingDir = workingDir(metadata.WorkingDir)
+		j.inputUID, j.inputGID = archiveOwner(metadata.User, log)
+		log.Info("构建镜像元数据", zap.String("image", j.Image), zap.String("working_dir", j.WorkingDir), zap.String("user", metadata.User))
 		buildScript := r.BuildScript
 		if buildScript == nil {
 			buildScript = Script
@@ -219,10 +241,7 @@ func (r *Runner) execute(parent context.Context, j Job, existing runtime.Handle)
 		if archiveErr != nil {
 			return result, archiveErr
 		}
-		if err = r.prepare(ctx, j); err != nil {
-			return result, err
-		}
-		result.Handle, err = r.Runtime.Create(ctx, runtime.RunSpec{Image: j.Image, Command: []string{"sh", "-c", script}, WorkingDir: "/builder", RequestHash: j.ID, Env: j.Env, KeepContainer: j.KeepContainer})
+		result.Handle, err = r.Runtime.Create(ctx, runtime.RunSpec{Image: j.Image, Command: []string{"sh", "-c", script}, WorkingDir: j.WorkingDir, RequestHash: j.ID, Env: j.Env, KeepContainer: j.KeepContainer})
 		if err != nil {
 			return result, err
 		}
@@ -232,7 +251,7 @@ func (r *Runner) execute(parent context.Context, j Job, existing runtime.Handle)
 				return result, err
 			}
 		}
-		if err = r.Runtime.PutArchive(ctx, result.Handle, "/builder", bytes.NewReader(archive)); err != nil {
+		if err = r.Runtime.PutArchive(ctx, result.Handle, j.WorkingDir, bytes.NewReader(archive)); err != nil {
 			return result, err
 		}
 		log.Debug("输入已注入", zap.String("operation", "put_archive"), zap.Int("bytes", len(archive)))
@@ -294,7 +313,7 @@ func (r *Runner) execute(parent context.Context, j Job, existing runtime.Handle)
 	if exit.Code != 0 {
 		return result, fmt.Errorf("Error while building firmware")
 	}
-	if err = extract(ctx, r.Runtime, result.Handle, "/builder/"+j.ID, j.ArtifactDir, log); err != nil {
+	if err = extract(ctx, r.Runtime, result.Handle, path.Join(workingDir(j.WorkingDir), j.ID), j.ArtifactDir, log); err != nil {
 		return result, fmt.Errorf("取回产物: %w", err)
 	}
 	result.ArtifactDir = j.ArtifactDir
