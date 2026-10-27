@@ -46,6 +46,10 @@ SQLite（`modernc.org/sqlite`，WAL）。只有 `asu serve` 进程打开数据�
 | stages | JSON | `[{name, at}]` 阶段时间线 |
 | options | JSON | 重放选项（verbose、keep_container、镜像 tag 覆盖、pull_policy） |
 
+普通任务再次提交时，`done`（未过期）、`queued`、`running` 仍复用；`failed`（包括超时、取消、中断）在重新验证与队列容量检查通过后，由事务内同主键删除/插入替换为全新 `queued` 记录，清空旧状态、handle、结果及阶段时间戳。并发提交在队列锁与事务内复查，只入队一次。拒绝入队不删除旧失败记录；GET/HEAD 只读失败结果，不触发替换。`rp_<ulid>` 诊断重放仍独立，不参与此去重逻辑。
+
+替换不新增独立日志路径：已有同 hash 日志继续受任务记录管理，新执行由 Hub.Begin 覆写；若未执行，Cleaner 仍按该记录的 `purge_at` 清理，避免产生无归属日志。旧容器由 Scavenger 按 managed-by 标签、活跃状态及既有 TTL/数量限制回收，不依赖已替换记录的 handle。
+
 ## stat_counters（统计计数）
 
 PK(day, metric, dim)；`value INTEGER`。

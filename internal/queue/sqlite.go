@@ -117,7 +117,7 @@ func (q *SQLite) Submit(ctx context.Context, r buildreq.Request, userAgent strin
 	if err != nil {
 		return Response{}, err
 	}
-	if resp.Status != 404 {
+	if resp.Status != 404 && resp.Stage != "failed" {
 		logging.OrNop(q.Options.Logger).Debug("复用缓存作业", zap.String("component", "queue"), zap.String("request_hash", id), zap.String("request_id", logging.RequestID(ctx)))
 		if err = count(ctx, q.DB, "cache_hits", r.Version); err != nil {
 			return Response{}, err
@@ -172,7 +172,7 @@ func (q *SQLite) Submit(ctx context.Context, r buildreq.Request, userAgent strin
 	var exists int
 	now := time.Now().UTC()
 	// 运行中的任务不因排队时间超过 TTL 而重复执行。
-	err = tx.QueryRowContext(ctx, `SELECT count(*) FROM jobs WHERE request_hash=? AND (status IN ('queued','running') OR expires_at IS NULL OR expires_at>?)`, id, now).Scan(&exists)
+	err = tx.QueryRowContext(ctx, `SELECT count(*) FROM jobs WHERE request_hash=? AND status!='failed' AND (status IN ('queued','running') OR expires_at IS NULL OR expires_at>?)`, id, now).Scan(&exists)
 	if err != nil {
 		return Response{}, err
 	}
@@ -193,7 +193,9 @@ func (q *SQLite) Submit(ctx context.Context, r buildreq.Request, userAgent strin
 		logging.OrNop(q.Options.Logger).Warn("构建队列已满", zap.String("component", "queue"), zap.Int("pending", pending), zap.String("request_hash", id))
 		return failure(529, fmt.Sprintf("server overload, queue contains too many build requests: %d", pending)), nil
 	}
-	// 同主键的过期记录可再次构建；删除仅限已完成记录，物理清理由 store-ttl 接续。
+	// 失败或过期记录由同主键的新任务替换。日志仍由同 hash 管理，
+	// 下次执行时 Hub 截断重建，未执行则由 Cleaner 按新任务 purge_at 清理；
+	// 已退出容器仍由 Scavenger 按标签与 TTL 回收，不依赖旧 handle。
 	if _, err = tx.ExecContext(ctx, `DELETE FROM jobs WHERE request_hash=?`, id); err != nil {
 		return Response{}, err
 	}

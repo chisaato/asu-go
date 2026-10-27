@@ -3,6 +3,7 @@ package httplog
 import (
 	"crypto/rand"
 	"encoding/hex"
+	"errors"
 	"net/http"
 	"strings"
 	"time"
@@ -40,7 +41,18 @@ func HTTP(logger *zap.Logger) gin.HandlerFunc {
 			} else if c.Request.URL.Path == "/healthz" || strings.HasPrefix(c.Request.URL.Path, "/admin/_nuxt/") || strings.HasPrefix(c.Request.URL.Path, "/admin/favicon") {
 				level = zapcore.DebugLevel
 			}
-			logger.Log(level, "HTTP 请求", zap.String("method", c.Request.Method), zap.String("path", c.Request.URL.Path), zap.String("route", c.FullPath()), zap.Int("status", status), zap.Float64("latency_ms", float64(time.Since(start).Microseconds())/1000), zap.String("client_ip", c.ClientIP()), zap.Int("bytes", max(c.Writer.Size(), 0)), zap.String("user_agent", c.Request.UserAgent()), zap.String("request_id", id))
+			fields := []zap.Field{zap.String("method", c.Request.Method), zap.String("path", c.Request.URL.Path), zap.String("route", c.FullPath()), zap.Int("status", status), zap.Float64("latency_ms", float64(time.Since(start).Microseconds())/1000), zap.String("client_ip", c.ClientIP()), zap.Int("bytes", max(c.Writer.Size(), 0)), zap.String("user_agent", c.Request.UserAgent()), zap.String("request_id", id)}
+			if len(c.Errors) > 0 {
+				causes := make([]error, 0, len(c.Errors))
+				for _, cause := range c.Errors {
+					causes = append(causes, cause.Err)
+				}
+				fields = append(fields, zap.Error(errors.Join(causes...)))
+			}
+			if hash := c.GetString("request_hash"); hash != "" {
+				fields = append(fields, zap.String("request_hash", hash))
+			}
+			logger.Log(level, "HTTP 请求", fields...)
 			if p != nil {
 				panic(p)
 			}

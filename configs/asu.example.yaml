@@ -10,6 +10,8 @@ server:
 log:
   format: json
   level: info
+  # 同时写 stdout 与文件；空字符串关闭文件输出。启动时超过 50MiB 轮转至 .1。
+  file: ""
 data_dir: data
 admin:
   # 为空仅禁用 Bearer 路径；没有有效 cookie 或 token 时返回 401。

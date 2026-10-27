@@ -20,6 +20,7 @@ import (
 	"github.com/gzzchh/asu-go/internal/admin"
 	"github.com/gzzchh/asu-go/internal/buildreq"
 	"github.com/gzzchh/asu-go/internal/db"
+	"github.com/gzzchh/asu-go/internal/httplog"
 	"github.com/gzzchh/asu-go/internal/metadata"
 	"github.com/gzzchh/asu-go/internal/queue"
 	"github.com/gzzchh/asu-go/internal/runner"
@@ -27,6 +28,9 @@ import (
 	"github.com/gzzchh/asu-go/internal/sources"
 	"github.com/gzzchh/asu-go/internal/store"
 	"github.com/gzzchh/asu-go/internal/stream"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
+	"go.uber.org/zap/zaptest/observer"
 )
 
 type buildMetadata struct{}
@@ -281,10 +285,6 @@ func TestBuildFailure(t *testing.T) {
 	if w.Code != 500 || w.Header().Get("X-Imagebuilder-Status") != "failed" {
 		t.Fatal(w)
 	}
-	w, _ = h.call("POST", "/api/v1/build", buildBody)
-	if w.Code != 500 {
-		t.Fatal(w.Code)
-	}
 	var n int
 	if err := h.db.QueryRow(`SELECT value FROM stat_counters WHERE metric='failures'`).Scan(&n); err != nil || n != 1 {
 		t.Fatal(n, err)
@@ -292,6 +292,120 @@ func TestBuildFailure(t *testing.T) {
 	var expires, finished time.Time
 	if err := h.db.QueryRow(`SELECT expires_at,finished_at FROM jobs`).Scan(&expires, &finished); err != nil || expires.Sub(finished) != time.Hour {
 		t.Fatal(expires, finished, err)
+	}
+	// 等上一轮 worker 退出后改为成功计划，验证再次提交会实际执行新构建。
+	h.cancel()
+	if err := <-h.done; err != nil {
+		t.Fatal(err)
+	}
+	h.cancel = nil
+	h.rt.plan.ExitCode = 0
+	h.rt.plan.Output = "新的构建输出\n"
+	w, retried := h.call("POST", "/api/v1/build", buildBody)
+	if w.Code != 202 || retried["request_hash"] != id || w.Header().Get("X-Imagebuilder-Status") != "queued" {
+		t.Fatal(w.Code, retried)
+	}
+	h.start()
+	h.poll(id, 200)
+	data, err := os.ReadFile(filepath.Join(h.dir, "logs", id+".log"))
+	if err != nil || !strings.Contains(string(data), "新的构建输出") || strings.Contains(string(data), "is too big") {
+		t.Fatal(string(data), err)
+	}
+	// 同 hash 重建不产生额外日志文件，常规失败/成功容器均由 Runner 清理。
+	entries, err := os.ReadDir(filepath.Join(h.dir, "logs"))
+	if err != nil || len(entries) != 1 || entries[0].Name() != id+".log" {
+		t.Fatal(entries, err)
+	}
+	states, err := h.rt.List(context.Background())
+	if err != nil || len(states) != 0 {
+		t.Fatal(states, err)
+	}
+}
+
+func TestFailedBuildRetryOverloadPreservesFailure(t *testing.T) {
+	h := newBuildHarness(t)
+	_, body := h.call("POST", "/api/v1/build", buildBody)
+	id := body["request_hash"].(string)
+	if _, err := h.q.Cancel(context.Background(), id); err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"one", "two"} {
+		w, _ := h.call("POST", "/api/v1/build", strings.Replace(buildBody, "luci", name, 1))
+		if w.Code != 202 {
+			t.Fatal(w.Code)
+		}
+	}
+	w, _ := h.call("POST", "/api/v1/build", buildBody)
+	if w.Code != 529 {
+		t.Fatal(w.Code)
+	}
+	w, failure := h.call("GET", "/api/v1/build/"+id, "")
+	if w.Code != 500 || failure["detail"] != "cancelled" {
+		t.Fatal(w.Code, failure)
+	}
+}
+
+func TestBuildInternalErrorIsLogged(t *testing.T) {
+	h := newBuildHarness(t)
+	core, logs := observer.New(zapcore.DebugLevel)
+	h.router = gin.New()
+	h.router.Use(httplog.HTTP(zap.New(core)))
+	RegisterBuild(h.router, h.q)
+	if _, err := h.db.Exec(`DROP TABLE jobs`); err != nil {
+		t.Fatal(err)
+	}
+	w, body := h.call("GET", "/api/v1/build/test-hash", "")
+	if w.Code != 500 || body["detail"] != "Internal Server Error" {
+		t.Fatal(w.Code, body)
+	}
+	fields := logs.All()[0].ContextMap()
+	if fields["request_hash"] != "test-hash" || !strings.Contains(fields["error"].(string), "no such table") {
+		t.Fatal(fields)
+	}
+}
+
+func TestConcurrentFailedBuildResubmission(t *testing.T) {
+	for _, reason := range []string{"failed", "timeout", "cancelled", "interrupted"} {
+		t.Run(reason, func(t *testing.T) {
+			h := newBuildHarness(t)
+			_, queued := h.call("POST", "/api/v1/build", buildBody)
+			id := queued["request_hash"].(string)
+			if _, err := h.db.Exec(`UPDATE jobs SET status='failed',stage='failed',detail=?,error='old output',finished_at=? WHERE request_hash=?`, reason, time.Now().UTC(), id); err != nil {
+				t.Fatal(err)
+			}
+			core, logs := observer.New(zapcore.DebugLevel)
+			h.router = gin.New()
+			h.router.Use(httplog.HTTP(zap.New(core)))
+			RegisterBuild(h.router, h.q)
+			for _, method := range []string{"GET", "HEAD"} {
+				w, _ := h.call(method, "/api/v1/build/"+id, "")
+				if w.Code != 500 || w.Header().Get("X-Imagebuilder-Status") != "failed" {
+					t.Fatal(w.Code)
+				}
+				fields := logs.All()[logs.Len()-1].ContextMap()
+				if fields["request_hash"] != id || fields["error"] != reason || strings.Contains(fields["error"].(string), "old output") {
+					t.Fatal(fields)
+				}
+			}
+			var wg sync.WaitGroup
+			for i := 0; i < 12; i++ {
+				wg.Go(func() {
+					w := httptest.NewRecorder()
+					h.router.ServeHTTP(w, httptest.NewRequest("POST", "/api/v1/build", strings.NewReader(buildBody)))
+					if w.Code != 202 {
+						t.Errorf("重新提交失败: %d %s", w.Code, w.Body)
+					}
+				})
+			}
+			wg.Wait()
+			var jobs, hits, reset int
+			if err := h.db.QueryRow(`SELECT count(*),sum(status='queued' AND stage='init' AND detail IS NULL AND error IS NULL AND finished_at IS NULL AND handle IS NULL) FROM jobs WHERE request_hash=?`, id).Scan(&jobs, &reset); err != nil || jobs != 1 || reset != 1 {
+				t.Fatal(jobs, reset, err)
+			}
+			if err := h.db.QueryRow(`SELECT sum(value) FROM stat_counters WHERE metric='cache_hits'`).Scan(&hits); err != nil || hits != 11 {
+				t.Fatal(hits, err)
+			}
+		})
 	}
 }
 

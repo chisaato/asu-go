@@ -10,6 +10,8 @@ server:
 log:
   format: json
   level: info
+  # 可设为 /data/asu.log；默认仅 stdout，由容器日志驱动收集。
+  file: ""
 data_dir: /data
 admin:
   # 也可用环境变量 ASU_ADMIN_TOKEN 提供（CLI 与自动化使用）。

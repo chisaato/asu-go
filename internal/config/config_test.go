@@ -130,6 +130,7 @@ func TestValidationPaths(t *testing.T) {
 		{"server.cors.admin_origins", func(c *Config) { c.Server.CORS.AdminOrigins = []string{"https://admin.example", "*"} }},
 		{"log.format", func(c *Config) { c.Log.Format = "invalid" }},
 		{"log.level", func(c *Config) { c.Log.Level = "invalid" }},
+		{"log.file", func(c *Config) { c.Log.File = "\x00invalid" }},
 		{"queue.driver", func(c *Config) { c.Queue.Driver = "redis" }},
 		{"store.driver", func(c *Config) { c.Store.Driver = "s3" }},
 		{"cleaner.interval", func(c *Config) { c.Cleaner.Interval = 0 }},
@@ -159,5 +160,36 @@ func TestValidationPaths(t *testing.T) {
 				t.Fatalf("校验错误缺少路径 %s: %v", tc.path, err)
 			}
 		})
+	}
+}
+
+func TestLogFileConfig(t *testing.T) {
+	for _, path := range []string{"", "/tmp/opencode/asu.log", "logs/asu.log"} {
+		cfg, err := Decode(strings.NewReader("log:\n  file: '" + path + "'\n"))
+		if err != nil || cfg.Log.File != path {
+			t.Fatal(cfg.Log, err)
+		}
+		if err := cfg.Validate(); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, path := range []string{" ", "\n", ".", "/", "logs/"} {
+		cfg := Default()
+		cfg.Log.File = path
+		if err := cfg.Validate(); err == nil || !strings.Contains(err.Error(), "log.file") {
+			t.Fatalf("未拒绝无效文件路径 %q: %v", path, err)
+		}
+	}
+	f, err := os.Open("../../configs/asu.compose.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = f.Close() }()
+	cfg, err := Decode(f)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := cfg.Validate(); err != nil {
+		t.Fatal(err)
 	}
 }

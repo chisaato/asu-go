@@ -48,6 +48,7 @@ type CORS struct {
 type Log struct {
 	Format string `yaml:"format"`
 	Level  string `yaml:"level"`
+	File   string `yaml:"file"`
 }
 
 type Admin struct {
@@ -225,6 +226,9 @@ func (c Config) Validate() error {
 	}
 	if _, err := zapcore.ParseLevel(c.Log.Level); err != nil {
 		return fmt.Errorf("log.level: %w", err)
+	}
+	if c.Log.File != "" && (strings.TrimSpace(c.Log.File) == "" || strings.ContainsAny(c.Log.File, "\x00\r\n") || filepath.Clean(c.Log.File) == "." || strings.HasSuffix(c.Log.File, string(os.PathSeparator))) {
+		return errors.New("log.file: 必须为有效文件路径或空字符串")
 	}
 	if c.DataDir == "" {
 		return errors.New("data_dir: 不得为空")

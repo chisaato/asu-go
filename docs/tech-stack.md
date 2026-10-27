@@ -186,6 +186,15 @@ K8S 预留要点（现在就遵守，避免日后返工）：
 - **分层**：Gin handler 只做参数绑定、调用 service、序列化响应；业务逻辑不得依赖 `*gin.Context`。
 - **日志**：全局使用 `*zap.Logger`（热路径可用 `SugaredLogger` 之外的强类型字段）；通过 `log.format`（`json` | `console`）与 `log.level` 配置，`console` 面向开发与终端阅读，`json` 面向生产采集。字段键名同样使用 snake_case，并固定携带 `request_hash`、`component` 等上下文字段。构建日志流（`stream` 包）与应用日志是两回事，不混用。
 - **应用日志级别与关联**：debug 用于引擎 API 调用、缓存命中、空转扫描；info 用于入队/出队、构建阶段及生命周期变化；warn 用于认证失败与可恢复清理/缓存异常；error 用于构建或执行失败。HTTP 日志包含 `method`、不含查询串的 `path`、模板 `route`、`status`、`latency_ms`、`client_ip`、`bytes`、`user_agent`、`request_id`；5xx/error、4xx/warn、其余/info，成功的健康检查及前端资源/debug。`X-Request-Id` 沿用或生成并回写，业务层通过标准 `context.Context` 获取；panic 同样关联此 ID。禁止记录 Authorization、Cookie、密码、token、请求体或生效配置中的秘密；查询串整体省略（包括 token 参数），不只遮挡某几个参数。SSE 在连接结束时记录。
+- **请求错误与堆栈**：handler 用 `c.Error(err)` 附加原因，HTTP 摘要通过 `zap.Error` 写入 `error`；构建失败查询附带 `request_hash` 与最多 512 字符的 `detail` 摘要，不复制 stderr 或完整构建输出。普通 4xx/5xx 不自动打印堆栈；Zap 自动堆栈阈值为 DPanic，panic 的 recover 日志仍显式保留堆栈。
+- **应用日志落盘**：`log.file` 默认 `""`，仅输出 stdout；设为文件路径后同时写 stdout 与文件（追加、权限 0600，自动创建父目录）。`console` 终端保持彩色，文件副本不带 ANSI 颜色码。仅启动时检查大小：已有文件 **大于 50MiB** 则重命名为 `<file>.1`，覆盖旧备份；运行中不轮转、不启动额外 goroutine。相对路径基于进程工作目录，打开/创建失败会报 `log.file` 启动错误。构建日志仍独立由 stream/TTL 管理。例如：
+
+  ```yaml
+  log:
+    format: console
+    level: info
+    file: /tmp/opencode/asu.log
+  ```
 - **错误**：向上返回带 `%w` 的 error；对外 API 在统一中间件里映射为 ASU 兼容的错误体。
 - **并发**：所有后台 goroutine 由 `serve` 命令持有的 `errgroup` 管理；使用 `context` 传播取消，优雅关闭须等待在途构建的容器被清理。
 - **SSE**：使用 Gin 的 `c.Stream` / `http.Flusher`，每连接订阅 `stream` 广播器；客户端断开即退订，不得泄漏 goroutine。

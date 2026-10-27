@@ -1,6 +1,7 @@
 package httplog
 
 import (
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -64,6 +65,22 @@ func TestHTTPLogging(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestHandlerErrorContext(t *testing.T) {
+	core, logs := observer.New(zapcore.DebugLevel)
+	r := gin.New()
+	r.Use(HTTP(zap.New(core)))
+	r.GET("/failure", func(c *gin.Context) {
+		_ = c.Error(errors.New("数据库不可用"))
+		c.Set("request_hash", "test-hash")
+		c.Status(500)
+	})
+	r.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest("GET", "/failure", nil))
+	fields := logs.All()[0].ContextMap()
+	if fields["error"] != "数据库不可用" || fields["request_hash"] != "test-hash" {
+		t.Fatal(fields)
 	}
 }
 

@@ -2,9 +2,11 @@ package api
 
 import (
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/gzzchh/asu-go/internal/buildreq"
@@ -14,8 +16,22 @@ import (
 func RegisterBuild(router *gin.Engine, q *queue.SQLite) {
 	write := func(c *gin.Context, response queue.Response, err error) {
 		if err != nil {
+			_ = c.Error(err)
 			c.JSON(http.StatusInternalServerError, gin.H{"status": 500, "detail": "Internal Server Error"})
 			return
+		}
+		if hash, ok := response.Body["request_hash"].(string); ok {
+			c.Set("request_hash", hash)
+		}
+		if response.Status >= 500 {
+			if detail, ok := response.Body["detail"].(string); ok {
+				// 仅记录失败原因摘要，绝不把 stderr 构建输出写入请求日志。
+				summary := []rune(strings.Join(strings.Fields(detail), " "))
+				if len(summary) > 512 {
+					summary = append(summary[:512], '…')
+				}
+				_ = c.Error(errors.New(string(summary)))
+			}
 		}
 		if response.Stage != "" {
 			c.Header("X-Imagebuilder-Status", response.Stage)
@@ -44,6 +60,7 @@ func RegisterBuild(router *gin.Engine, q *queue.SQLite) {
 		write(c, response, err)
 	})
 	poll := func(c *gin.Context) {
+		c.Set("request_hash", c.Param("hash"))
 		response, err := q.Get(c.Request.Context(), c.Param("hash"))
 		write(c, response, err)
 	}
