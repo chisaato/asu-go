@@ -48,3 +48,14 @@ GoLand：
 3. 在客户端把 ASU 服务器地址指向本服务（LuCI：attendedsysupgrade 设置里的服务器 URL；owut：见 `owut --help` 中的 ASU 服务器相关选项）。
 4. 观察构建：`curl -H "Authorization: Bearer dev-token" http://localhost:8000/admin/api/jobs`；实时日志：`curl -N -H "Authorization: Bearer dev-token" "http://localhost:8000/admin/api/jobs/<hash>/log?follow=1"`。
 5. 构建失败时用 `asu replay <hash>` 做诊断重放（默认带 `V=s` 并保留容器）。
+
+## owut 真实抓包回归夹具
+
+`internal/api/testdata/owut/` 来自用户提供的 `owut.pcapng`（2026-10-27，SHA-256：`87fad12673e4484c45a663781b8b68330cc5cbefd7cdcf15b7acf682f615b89a`），客户端为 `owut/2026.01.13~2526d84b-r1`。共 12 个 HTTP 事务：9 个 ImmortalWrt 24.10.6 / 25.12.2 元数据 GET、1 个构建 POST、失败后的 HEAD 与 GET。抓包没有单独的 latest、revision、profile 请求，不能将合成数据标成真实抓包；latest 回归取自真实 overview 的 latest 字段。
+
+- `transactions.json` 保存全部事务的方法、路径、脱敏请求/响应头、响应状态及正文文件名；`body_sha256` 是裁剪前、解 chunk 后原始正文的摘要，`selection` 说明裁剪范围。重复正文共用文件，HEAD 正文为 null。
+- `overview.json` 保留完整分支/版本/服务器信息，各分支 targets 仅保留 `mediatek/filogic`。`packages-*.json` 与 `target-index-*.json` 只选取少量真实包，保留原始包名、版本与架构。构建请求、queued/failed 响应正文逐字保留。
+- 测试使用内存 HTTP transport 和 fake Runtime，无网络、容器或原始 pcap 文件依赖。由于抓包记录的是 ASU 输出而非下载站上游，fake upstream 仅添加 v2 index 包装与单个合成 feed，profiles 返回 404 以跳过二次 kmod 合并；不把这些包装称为真实上游数据。构建 profile 查询使用已有 fake。
+- `TestOWUTCapturedRequest` 固定规范请求哈希；`TestOWUTCapturedMetadataTransactions` 重放 9 个元数据事务并验证 latest 发行版隔离；`TestOWUTCapturedBuildSubmitAndFailure` 验证前缀提交 202、保存的 distro、失败 GET/HEAD 的 500 与响应头/字段（对照原版 `return_job_v1`）。仅排队时间允许变化。
+
+更新方法：先用 `tshark -r <新抓包> -Y http -T fields -e tcp.stream -e http.request.method -e http.request.uri -e http.response.code` 核对事务，再用 `tshark -r <新抓包> -q -z follow,tcp,raw,<stream>` 分方向重组 TCP 流，拆分 HTTP 头/体并解码 chunked（HEAD 不读取正文）。提取脚本只放 `/tmp/opencode/`，原始抓包不入库。生成 manifest 前删除 Authorization、Proxy-Authorization、Cookie、Set-Cookie 等敏感头，检查正文是否有秘密；大 JSON 只能删除不需要的条目，不得手改真实字段值。更新文件、摘要、裁剪说明和来源信息，复核哈希；若旧服务响应确有错误，应在测试注明并断言修正后的发行版隔离行为，而不是照抄错误。最后运行 `make build && make test && make lint`。

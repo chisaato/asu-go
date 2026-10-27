@@ -1,0 +1,8 @@
+{
+  "architecture": "aarch64_cortex-a53",
+  "packages": {
+    "base-files": "1950~0c4cd0f9920a",
+    "kernel": "6.12.103~b5b7729ffbba3ecdd83f339de8fadfb8-r1",
+    "kmod-mt7915e": "6.12.103.2026.03.19~39c960c3-r2"
+  }
+}

@@ -1,0 +1,1 @@
+{"detail":"Error while building firmware. See stdout/stderr","enqueued_at":"2026-10-27T21:16:20.196189713Z","request_hash":"ea6405314694f787c99984b33419d928da46066a2f761345a39c1a215c2b395e","status":500,"stderr":"##asu:stage=init\n##asu:stage=container_setup\nmkfifo: cannot create fifo '.asu-pipe': Permission denied\n"}

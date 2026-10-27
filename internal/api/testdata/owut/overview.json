@@ -1,0 +1,204 @@
+{
+  "latest": [
+    "25.12.2",
+    "24.10.6"
+  ],
+  "branches": {
+    "24.10": {
+      "path": "releases/{version}",
+      "enabled": true,
+      "snapshot": false,
+      "path_packages": "DEPRECATED",
+      "branch_off_rev": 27990,
+      "package_changes": [
+        {
+          "source": "firewall",
+          "target": "firewall4",
+          "revision": 18611
+        },
+        {
+          "source": "kmod-nft-nat6",
+          "revision": 20282,
+          "mandatory": true
+        },
+        {
+          "source": "libustream-wolfssl",
+          "target": "libustream-mbedtls",
+          "revision": 21994
+        },
+        {
+          "source": "px5g-wolfssl",
+          "target": "px5g-mbedtls",
+          "revision": 21994
+        },
+        {
+          "source": "wpad-basic-wolfssl",
+          "target": "wpad-basic-mbedtls",
+          "revision": 21994
+        },
+        {
+          "source": "luci-app-diag-core",
+          "revision": 25984,
+          "mandatory": true
+        },
+        {
+          "source": "auc",
+          "target": "owut",
+          "revision": 26792
+        },
+        {
+          "source": "luci-app-opkg",
+          "target": "luci-app-package-manager",
+          "revision": 27897
+        }
+      ],
+      "name": "24.10",
+      "versions": [
+        "24.10.6",
+        "24.10.5",
+        "24.10.4",
+        "24.10.3",
+        "24.10.2",
+        "24.10.1",
+        "24.10.0",
+        "24.10-SNAPSHOT"
+      ],
+      "targets": {
+        "mediatek/filogic": "aarch64_cortex-a53"
+      }
+    },
+    "25.12": {
+      "path": "releases/{version}",
+      "enabled": true,
+      "snapshot": false,
+      "path_packages": "DEPRECATED",
+      "branch_off_rev": 32295,
+      "package_changes": [
+        {
+          "source": "firewall",
+          "target": "firewall4",
+          "revision": 18611
+        },
+        {
+          "source": "kmod-nft-nat6",
+          "revision": 20282,
+          "mandatory": true
+        },
+        {
+          "source": "libustream-wolfssl",
+          "target": "libustream-mbedtls",
+          "revision": 21994
+        },
+        {
+          "source": "px5g-wolfssl",
+          "target": "px5g-mbedtls",
+          "revision": 21994
+        },
+        {
+          "source": "wpad-basic-wolfssl",
+          "target": "wpad-basic-mbedtls",
+          "revision": 21994
+        },
+        {
+          "source": "luci-app-diag-core",
+          "revision": 25984,
+          "mandatory": true
+        },
+        {
+          "source": "auc",
+          "target": "owut",
+          "revision": 26792
+        },
+        {
+          "source": "luci-app-opkg",
+          "target": "luci-app-package-manager",
+          "revision": 27897
+        },
+        {
+          "source": "opkg",
+          "target": "apk-mbedtls",
+          "revision": 28056
+        }
+      ],
+      "name": "25.12",
+      "versions": [
+        "25.12.2",
+        "25.12.1",
+        "25.12.0",
+        "25.12-SNAPSHOT"
+      ],
+      "targets": {
+        "mediatek/filogic": "aarch64_cortex-a53"
+      }
+    },
+    "SNAPSHOT": {
+      "path": "snapshots",
+      "enabled": true,
+      "snapshot": true,
+      "path_packages": "DEPRECATED",
+      "package_changes": [
+        {
+          "source": "firewall",
+          "target": "firewall4",
+          "revision": 18611
+        },
+        {
+          "source": "kmod-nft-nat6",
+          "revision": 20282,
+          "mandatory": true
+        },
+        {
+          "source": "libustream-wolfssl",
+          "target": "libustream-mbedtls",
+          "revision": 21994
+        },
+        {
+          "source": "px5g-wolfssl",
+          "target": "px5g-mbedtls",
+          "revision": 21994
+        },
+        {
+          "source": "wpad-basic-wolfssl",
+          "target": "wpad-basic-mbedtls",
+          "revision": 21994
+        },
+        {
+          "source": "luci-app-diag-core",
+          "revision": 25984,
+          "mandatory": true
+        },
+        {
+          "source": "auc",
+          "target": "owut",
+          "revision": 26792
+        },
+        {
+          "source": "luci-app-opkg",
+          "target": "luci-app-package-manager",
+          "revision": 27897
+        },
+        {
+          "source": "opkg",
+          "target": "apk-mbedtls",
+          "revision": 28056
+        }
+      ],
+      "name": "SNAPSHOT",
+      "versions": [
+        "SNAPSHOT"
+      ],
+      "targets": {
+        "mediatek/filogic": "aarch64_cortex-a53"
+      }
+    }
+  },
+  "upstream_url": "https://downloads.immortalwrt.org",
+  "server": {
+    "version": "dev",
+    "contact": "mail@aparcar.org",
+    "allow_defaults": false,
+    "repository_allow_list": [],
+    "max_custom_rootfs_size_mb": 1024,
+    "max_defaults_length": 20480
+  }
+}

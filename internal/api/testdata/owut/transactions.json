@@ -1,0 +1,294 @@
+[
+  {
+    "stream": 0,
+    "method": "GET",
+    "path": "/immortalwrt/json/v1/overview.json",
+    "status": 200,
+    "request": {
+      "headers": {
+        "Host": "127.0.0.1:8965",
+        "User-Agent": "owut/2026.01.13~2526d84b-r1"
+      },
+      "body_file": null
+    },
+    "response": {
+      "headers": {
+        "Content-Type": "application/json; charset=utf-8",
+        "X-Request-Id": "1c79e1d4e61660a5714cd40fe1d0d5f8",
+        "Date": "Tue, 27 Oct 2026 21:15:30 GMT",
+        "Transfer-Encoding": "chunked"
+      },
+      "body_file": "overview.json",
+      "body_sha256": "c873fefdf88d0e6dfd183a6acfe90080210b56491d03a9d754909b3024bd0628",
+      "selection": "branches.*.targets 仅保留 mediatek/filogic；其余字段完整保留"
+    }
+  },
+  {
+    "stream": 1,
+    "method": "GET",
+    "path": "/immortalwrt/json/v1/releases/24.10.6/packages/aarch64_cortex-a53-index.json",
+    "status": 200,
+    "request": {
+      "headers": {
+        "Host": "127.0.0.1:8965",
+        "User-Agent": "owut/2026.01.13~2526d84b-r1"
+      },
+      "body_file": null
+    },
+    "response": {
+      "headers": {
+        "Content-Type": "application/json; charset=utf-8",
+        "X-Request-Id": "f14fc53220d621a1d9c6be8d568b6059",
+        "Date": "Tue, 27 Oct 2026 21:15:34 GMT",
+        "Transfer-Encoding": "chunked"
+      },
+      "body_file": "packages-24.10.6.json",
+      "body_sha256": "c25a05f588304c8ab1b1ab09ab76bbd7a14898efa8cac738bf0f4973892f675f",
+      "selection": "仅保留 owut、luci-app-attendedsysupgrade、base-files 中实际存在的包"
+    }
+  },
+  {
+    "stream": 2,
+    "method": "GET",
+    "path": "/immortalwrt/json/v1/releases/24.10.6/targets/mediatek/filogic/index.json",
+    "status": 200,
+    "request": {
+      "headers": {
+        "Host": "127.0.0.1:8965",
+        "User-Agent": "owut/2026.01.13~2526d84b-r1"
+      },
+      "body_file": null
+    },
+    "response": {
+      "headers": {
+        "Content-Type": "application/json; charset=utf-8",
+        "X-Request-Id": "3c3c3021f7eeaf9a49d57353be4e893d",
+        "Date": "Tue, 27 Oct 2026 21:15:35 GMT",
+        "Transfer-Encoding": "chunked"
+      },
+      "body_file": "target-index-24.10.6.json",
+      "body_sha256": "a295256c8cdfc0ad4a0e1ed6f2b21cdd3e60bd4f2225688b0fb6e897d34cdd6d",
+      "selection": "packages 仅保留 base-files、kernel、kmod-mt7915e；architecture 原样保留"
+    }
+  },
+  {
+    "stream": 3,
+    "method": "GET",
+    "path": "/immortalwrt/json/v1/overview.json",
+    "status": 200,
+    "request": {
+      "headers": {
+        "Host": "127.0.0.1:8965",
+        "User-Agent": "owut/2026.01.13~2526d84b-r1"
+      },
+      "body_file": null
+    },
+    "response": {
+      "headers": {
+        "Content-Type": "application/json; charset=utf-8",
+        "X-Request-Id": "f08c1d1743accca697c0ade0283c2d40",
+        "Date": "Tue, 27 Oct 2026 21:15:53 GMT",
+        "Transfer-Encoding": "chunked"
+      },
+      "body_file": "overview.json",
+      "body_sha256": "c873fefdf88d0e6dfd183a6acfe90080210b56491d03a9d754909b3024bd0628",
+      "selection": "branches.*.targets 仅保留 mediatek/filogic；其余字段完整保留"
+    }
+  },
+  {
+    "stream": 4,
+    "method": "GET",
+    "path": "/immortalwrt/json/v1/releases/24.10.6/packages/aarch64_cortex-a53-index.json",
+    "status": 200,
+    "request": {
+      "headers": {
+        "Host": "127.0.0.1:8965",
+        "User-Agent": "owut/2026.01.13~2526d84b-r1"
+      },
+      "body_file": null
+    },
+    "response": {
+      "headers": {
+        "Content-Type": "application/json; charset=utf-8",
+        "X-Request-Id": "4b7b2fb0a1f1bc82c4bf1d4e64dd6e63",
+        "Date": "Tue, 27 Oct 2026 21:15:55 GMT",
+        "Transfer-Encoding": "chunked"
+      },
+      "body_file": "packages-24.10.6.json",
+      "body_sha256": "c25a05f588304c8ab1b1ab09ab76bbd7a14898efa8cac738bf0f4973892f675f",
+      "selection": "仅保留 owut、luci-app-attendedsysupgrade、base-files 中实际存在的包"
+    }
+  },
+  {
+    "stream": 5,
+    "method": "GET",
+    "path": "/immortalwrt/json/v1/releases/24.10.6/targets/mediatek/filogic/index.json",
+    "status": 200,
+    "request": {
+      "headers": {
+        "Host": "127.0.0.1:8965",
+        "User-Agent": "owut/2026.01.13~2526d84b-r1"
+      },
+      "body_file": null
+    },
+    "response": {
+      "headers": {
+        "Content-Type": "application/json; charset=utf-8",
+        "X-Request-Id": "0c0a1d6106e82b6c4260965007cc48d6",
+        "Date": "Tue, 27 Oct 2026 21:15:55 GMT",
+        "Transfer-Encoding": "chunked"
+      },
+      "body_file": "target-index-24.10.6.json",
+      "body_sha256": "a295256c8cdfc0ad4a0e1ed6f2b21cdd3e60bd4f2225688b0fb6e897d34cdd6d",
+      "selection": "packages 仅保留 base-files、kernel、kmod-mt7915e；architecture 原样保留"
+    }
+  },
+  {
+    "stream": 6,
+    "method": "GET",
+    "path": "/immortalwrt/json/v1/overview.json",
+    "status": 200,
+    "request": {
+      "headers": {
+        "Host": "127.0.0.1:8965",
+        "User-Agent": "owut/2026.01.13~2526d84b-r1"
+      },
+      "body_file": null
+    },
+    "response": {
+      "headers": {
+        "Content-Type": "application/json; charset=utf-8",
+        "X-Request-Id": "ad7db5ca6058979cd162314b9eb67b95",
+        "Date": "Tue, 27 Oct 2026 21:16:12 GMT",
+        "Transfer-Encoding": "chunked"
+      },
+      "body_file": "overview.json",
+      "body_sha256": "c873fefdf88d0e6dfd183a6acfe90080210b56491d03a9d754909b3024bd0628",
+      "selection": "branches.*.targets 仅保留 mediatek/filogic；其余字段完整保留"
+    }
+  },
+  {
+    "stream": 7,
+    "method": "GET",
+    "path": "/immortalwrt/json/v1/releases/25.12.2/packages/aarch64_cortex-a53-index.json",
+    "status": 200,
+    "request": {
+      "headers": {
+        "Host": "127.0.0.1:8965",
+        "User-Agent": "owut/2026.01.13~2526d84b-r1"
+      },
+      "body_file": null
+    },
+    "response": {
+      "headers": {
+        "Content-Type": "application/json; charset=utf-8",
+        "X-Request-Id": "921cd873dd972a1b5003482d0d9ea8ce",
+        "Date": "Tue, 27 Oct 2026 21:16:16 GMT",
+        "Transfer-Encoding": "chunked"
+      },
+      "body_file": "packages-25.12.2.json",
+      "body_sha256": "af32312f5c802ac6f2e634812b4e17d55547ecd7df300b36f9416223c9a0373f",
+      "selection": "仅保留 owut、luci-app-attendedsysupgrade、base-files 中实际存在的包"
+    }
+  },
+  {
+    "stream": 8,
+    "method": "GET",
+    "path": "/immortalwrt/json/v1/releases/25.12.2/targets/mediatek/filogic/index.json",
+    "status": 200,
+    "request": {
+      "headers": {
+        "Host": "127.0.0.1:8965",
+        "User-Agent": "owut/2026.01.13~2526d84b-r1"
+      },
+      "body_file": null
+    },
+    "response": {
+      "headers": {
+        "Content-Type": "application/json; charset=utf-8",
+        "X-Request-Id": "649d4cd735cb60d512a7f80589a7aa2b",
+        "Date": "Tue, 27 Oct 2026 21:16:16 GMT",
+        "Transfer-Encoding": "chunked"
+      },
+      "body_file": "target-index-25.12.2.json",
+      "body_sha256": "5f54e209363501768c31703f43056f49611dbe0fd679ead2bbeafedda78ddb15",
+      "selection": "packages 仅保留 base-files、kernel、kmod-mt7915e；architecture 原样保留"
+    }
+  },
+  {
+    "stream": 9,
+    "method": "POST",
+    "path": "/immortalwrt/api/v1/build",
+    "status": 202,
+    "request": {
+      "headers": {
+        "Host": "127.0.0.1:8965",
+        "User-Agent": "owut/2026.01.13~2526d84b-r1",
+        "Content-Type": "application/json",
+        "Transfer-Encoding": "chunked"
+      },
+      "body_file": "build-request-immortalwrt-25.12.2.json",
+      "body_sha256": "b8224ed2a25305e28fd99d2d070fa66261371aed41c4ceedf4e63d08eaba1d59"
+    },
+    "response": {
+      "headers": {
+        "Content-Type": "application/json; charset=utf-8",
+        "X-Imagebuilder-Status": "queued",
+        "X-Queue-Position": "0",
+        "X-Request-Id": "41dcc3874245d3de9b9923e1fa3a60bb",
+        "Date": "Tue, 27 Oct 2026 21:16:20 GMT",
+        "Content-Length": "180"
+      },
+      "body_file": "build-queued.json",
+      "body_sha256": "af927c59be759f14ec2855e33a2e8672740cbc69f205d58a180baef82e224788"
+    }
+  },
+  {
+    "stream": 10,
+    "method": "HEAD",
+    "path": "/immortalwrt/api/v1/build/ea6405314694f787c99984b33419d928da46066a2f761345a39c1a215c2b395e",
+    "status": 500,
+    "request": {
+      "headers": {
+        "Host": "127.0.0.1:8965",
+        "User-Agent": "owut/2026.01.13~2526d84b-r1"
+      },
+      "body_file": null
+    },
+    "response": {
+      "headers": {
+        "Content-Type": "application/json",
+        "X-Imagebuilder-Status": "failed",
+        "X-Queue-Position": "0",
+        "X-Request-Id": "fc20dc375f7ce8b7a4fa1efd33e81236",
+        "Date": "Tue, 27 Oct 2026 21:16:20 GMT"
+      },
+      "body_file": null
+    }
+  },
+  {
+    "stream": 11,
+    "method": "GET",
+    "path": "/immortalwrt/api/v1/build/ea6405314694f787c99984b33419d928da46066a2f761345a39c1a215c2b395e",
+    "status": 500,
+    "request": {
+      "headers": {
+        "Host": "127.0.0.1:8965",
+        "User-Agent": "owut/2026.01.13~2526d84b-r1"
+      },
+      "body_file": null
+    },
+    "response": {
+      "headers": {
+        "Content-Type": "application/json; charset=utf-8",
+        "X-Imagebuilder-Status": "failed",
+        "X-Queue-Position": "0",
+        "X-Request-Id": "b898ce773bfb14181e454d3b9dedc051",
+        "Date": "Tue, 27 Oct 2026 21:16:20 GMT",
+        "Content-Length": "321"
+      },
+      "body_file": "build-failed.json",
+      "body_sha256": "fe5e6ed54cec5da967085b3fd7402f8e458bf43b4b62589efe7887d48ac68759"
+    }
+  }
+]
