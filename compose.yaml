@@ -1,0 +1,30 @@
+# 用法：
+#   cp configs/asu.compose.yaml asu.yaml   # 按需修改
+#   docker compose up -d --build           # Podman: podman compose up -d --build
+#
+# 宿主引擎 socket 默认为 Docker 的 /var/run/docker.sock。
+# 使用 rootless Podman 时设置：
+#   ASU_ENGINE_SOCKET=$XDG_RUNTIME_DIR/podman/podman.sock
+#   （先 `systemctl --user enable --now podman.socket`）
+services:
+  asu:
+    build:
+      context: .
+      args:
+        VERSION: ${ASU_VERSION:-dev}
+    image: asu-go:${ASU_VERSION:-dev}
+    container_name: asu-go
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      ASU_ADMIN_TOKEN: ${ASU_ADMIN_TOKEN:-}
+    volumes:
+      # 数据目录使用 bind mount：数据库、日志、产物、元数据缓存
+      - ./data:/data
+      - ./asu.yaml:/etc/asu/asu.yaml:ro
+      # 构建容器作为“兄弟容器”由宿主引擎创建
+      - ${ASU_ENGINE_SOCKET:-/var/run/docker.sock}:/var/run/docker.sock
+    # SELinux（如 Fedora）下允许容器访问宿主引擎 socket
+    security_opt:
+      - label=disable

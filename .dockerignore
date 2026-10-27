@@ -1,0 +1,10 @@
+.git
+.worktrees
+.scratch
+bin
+data
+web/node_modules
+web/.nuxt
+web/.output
+web/dist
+asu.yaml
