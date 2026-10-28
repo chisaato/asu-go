@@ -13,7 +13,7 @@ import (
 )
 
 func TestFormats(t *testing.T) {
-	for _, format := range []string{"json", "console"} {
+	for _, format := range []string{"json", "text", "plain", "console"} {
 		t.Run(format, func(t *testing.T) {
 			r, w, err := os.Pipe()
 			if err != nil {
@@ -31,7 +31,7 @@ func TestFormats(t *testing.T) {
 				t.Fatal(err)
 			}
 			logger.Debug("不可见")
-			logger.Info("测试日志", zap.String("component", "test"))
+			logger.Info("测试日志", zap.String("component", "test"), zap.String("msg_with_space", "hello world"), zap.Int("code", 200))
 			_ = logger.Sync()
 			if err := w.Close(); err != nil {
 				t.Fatal(err)
@@ -51,8 +51,17 @@ func TestFormats(t *testing.T) {
 				if entry["component"] != "test" || entry["level"] != "info" {
 					t.Fatalf("结构化字段不正确: %v", entry)
 				}
-			} else if json.Valid(data) || !strings.Contains(string(data), "INFO") || !strings.Contains(string(data), "\x1b[") {
-				t.Fatalf("console 应使用易读彩色格式: %q", data)
+			} else {
+				str := string(data)
+				if json.Valid(data) || !strings.Contains(str, "INFO") || !strings.Contains(str, "\x1b[") {
+					t.Fatalf("%s 应使用易读彩色格式: %q", format, str)
+				}
+				if strings.Contains(str, `{"component"`) {
+					t.Fatalf("%s 不应包含 JSON 大对象: %q", format, str)
+				}
+				if !strings.Contains(str, "component=test") || !strings.Contains(str, `msg_with_space="hello world"`) || !strings.Contains(str, "code=200") {
+					t.Fatalf("%s 应使用 label=value 格式: %q", format, str)
+				}
 			}
 		})
 	}
@@ -67,7 +76,7 @@ func TestInvalidConfig(t *testing.T) {
 }
 
 func TestFileLogging(t *testing.T) {
-	for _, format := range []string{"json", "console"} {
+	for _, format := range []string{"json", "text", "plain", "console"} {
 		t.Run(format, func(t *testing.T) {
 			path := filepath.Join(t.TempDir(), "nested", "asu.log")
 			for i := 0; i < 2; i++ {

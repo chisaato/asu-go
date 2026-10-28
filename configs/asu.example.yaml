@@ -10,6 +10,7 @@ server:
     # 管理 /admin/api/：默认仅同源；精确来源启用凭据，禁止 *，不影响 /admin 静态页面。
     admin_origins: []
 log:
+  # 可选 json、text（或 plain，面向终端阅读的 label=value 格式，兼容 console）
   format: json
   level: info
   # 同时写 stdout 与文件；空字符串关闭文件输出。启动时超过 50MiB 轮转至 .1。

@@ -284,8 +284,10 @@ func (c Config) Validate() error {
 	} else if n, err := strconv.Atoi(port); err != nil || n < 0 || n > 65535 {
 		return errors.New("server.listen: 端口必须为 0 到 65535 的整数")
 	}
-	if c.Log.Format != "json" && c.Log.Format != "console" {
-		return errors.New("log.format: 仅支持 json 或 console")
+	switch c.Log.Format {
+	case "json", "text", "plain", "console":
+	default:
+		return errors.New("log.format: 仅支持 json、text 或 plain")
 	}
 	if _, err := zapcore.ParseLevel(c.Log.Level); err != nil {
 		return fmt.Errorf("log.level: %w", err)

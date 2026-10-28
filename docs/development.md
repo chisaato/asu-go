@@ -20,7 +20,7 @@ docker compose up -d --build                # Podman: podman compose up -d --bui
 
 ```yaml
 server: {listen: ":8000"}
-log: {format: console, level: debug}
+log: {format: text, level: debug}
 data_dir: data
 admin:
   api_token: dev-token

@@ -112,7 +112,7 @@ go func() {
 
 ### 3.5 应用日志（Zap）
 
-应用日志与 `{data_dir}/logs/{id}.log` 的构建输出完全分离：绝不把构建输出行（包括失败时的 tail）复制到 Zap；阶段标记仅提取阶段名称。通过 `log.level` / `log.format` 控制级别与 JSON/console 格式。
+应用日志与 `{data_dir}/logs/{id}.log` 的构建输出完全分离：绝不把构建输出行（包括失败时的 tail）复制到 Zap；阶段标记仅提取阶段名称。通过 `log.level` / `log.format` 控制级别与 JSON/text/plain 格式。
 
 - 固定使用 snake_case 字段：`component`（`http` / `queue` / `runner` / `runtime` / `scavenger` 等）、`request_hash`、`job_id`、`distribution`、`version`、`target`、`profile`；HTTP 链路额外带 `request_id`。后台任务不伪造 HTTP request_id，通过 request_hash 关联入队请求。
 - 入队、出队（`queue_duration`）、开始/完成/失败（`duration`）、每次阶段变化（`stage`、`previous_stage`、`stage_duration`）均记录。超时/取消通过失败日志中的 `reason` 区分；关闭时记录 kill/remove 清理。耗时字段由 Zap duration encoder 编码，HTTP 的 `latency_ms` 固定毫秒。

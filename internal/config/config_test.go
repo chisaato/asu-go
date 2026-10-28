@@ -213,3 +213,13 @@ func TestLogFileConfig(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestLogFormatValidValues(t *testing.T) {
+	for _, format := range []string{"json", "text", "plain", "console"} {
+		cfg := Default()
+		cfg.Log.Format = format
+		if err := cfg.Validate(); err != nil {
+			t.Fatalf("合法格式 %q 应通过校验: %v", format, err)
+		}
+	}
+}

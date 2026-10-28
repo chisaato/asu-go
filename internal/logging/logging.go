@@ -11,7 +11,9 @@ import (
 )
 
 func New(cfg config.Log) (*zap.Logger, error) {
-	if cfg.Format != "json" && cfg.Format != "console" {
+	switch cfg.Format {
+	case "json", "text", "plain", "console":
+	default:
 		return nil, fmt.Errorf("log.format: 不支持 %q", cfg.Format)
 	}
 	level, err := zapcore.ParseLevel(cfg.Level)
@@ -23,11 +25,12 @@ func New(cfg config.Log) (*zap.Logger, error) {
 	encoderConfig.EncodeTime = zapcore.ISO8601TimeEncoder
 	fileEncoder := zapcore.NewJSONEncoder(encoderConfig)
 	stdoutEncoder := fileEncoder.Clone()
-	if cfg.Format == "console" {
+	if cfg.Format != "json" {
 		encoderConfig.EncodeLevel = zapcore.CapitalLevelEncoder
-		fileEncoder = zapcore.NewConsoleEncoder(encoderConfig)
+		encoderConfig.EncodeDuration = zapcore.StringDurationEncoder
+		fileEncoder = newTextEncoder(encoderConfig)
 		encoderConfig.EncodeLevel = zapcore.CapitalColorLevelEncoder
-		stdoutEncoder = zapcore.NewConsoleEncoder(encoderConfig)
+		stdoutEncoder = newTextEncoder(encoderConfig)
 	}
 	cores := []zapcore.Core{zapcore.NewCore(stdoutEncoder, zapcore.Lock(os.Stdout), level)}
 	if cfg.File != "" {

@@ -53,7 +53,7 @@ export function useSettings() {
             listen: ':8000',
             cors_origins: ['*'],
             log_level: 'info',
-            log_format: 'console'
+            log_format: 'text'
           },
           storage: {
             data_dir: './data',

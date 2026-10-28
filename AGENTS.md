@@ -16,7 +16,7 @@ ASU-Go：用 Go 重写的 OpenWrt Attended Sysupgrade 服务端，单二进制�
 
 ## 技术栈速览
 
-- 后端：Go + **Gin**（HTTP/SSE）+ **Cobra**（CLI）+ YAML 配置（`yaml.v3` 严格解码，**不用 Viper**，键名**全小写 snake_case**，字段必须显式 `yaml` 标签）+ **Zap** 日志（`log.format`: `json`/`console`） + SQLite（`modernc.org/sqlite`，免 CGO）
+- 后端：Go + **Gin**（HTTP/SSE）+ **Cobra**（CLI）+ YAML 配置（`yaml.v3` 严格解码，**不用 Viper**，键名**全小写 snake_case**，字段必须显式 `yaml` 标签）+ **Zap** 日志（`log.format`: `json`/`text`/`plain`） + SQLite（`modernc.org/sqlite`，免 CGO）
 - 容器：`internal/runtime.Runtime` 接口；Docker / Podman 首发（Moby client，Podman 走兼容 socket）；Kubernetes 仅预留接口，不要提前实现
 - 前端：**Bun + Nuxt 4（SPA，`ssr: false`）+ Nuxt UI v4**，位于 `web/`，`nuxt generate` 产物经 `go:embed` 嵌入二进制，挂载于 `/admin`
 - 单仓库、单 `go.mod`；业务代码全部在 `internal/`
