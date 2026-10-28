@@ -1,0 +1,22 @@
+name: docker-cleanup
+
+# 定时清理无 tag 的镜像版本；该 action 会保留仍被多架构 manifest 引用的子镜像
+on:
+  schedule:
+    - cron: "0 3 * * 0"
+  workflow_dispatch:
+
+permissions:
+  packages: write
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: snok/container-retention-policy@v3
+        with:
+          account: ${{ github.repository_owner }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          image-names: ${{ github.event.repository.name }}
+          tag-selection: untagged
+          cut-off: 1w

@@ -1,0 +1,21 @@
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - uses: oven-sh/setup-bun@v2
+      # 前端产物需先生成，go:embed 才能通过编译
+      - run: cd web && bun install --frozen-lockfile && bun run generate
+      - run: go vet ./...
+      - run: go test ./...
+      - run: cd web && bun run test

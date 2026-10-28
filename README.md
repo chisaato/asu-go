@@ -1,80 +1,62 @@
-# ASU-Go (Attended Sysupgrade Server in Go)
+# ASU-Go 🚀
 
-一个轻量、高性能、高度可观测且自带管理控制台的 OpenWrt / 嵌入式 Linux 固件定制构建服务端。
+用 Go 重写的 OpenWrt **Attended Sysupgrade** 服务端：单二进制、自带管理后台、构建日志实时可见。
 
-基于 Go 语言重写，旨在彻底替代原版 Python FastAPI + Redis-Stack + RQ 的复杂技术栈，兼容官方客户端（LuCI `luci-app-attendedsysupgrade`、`owut` CLI、`firmware-selector` 等），并解决原版构建黑盒、无实时构建日志流、缺乏任务运维后台的痛点。
+兼容官方客户端（LuCI `luci-app-attendedsysupgrade`、`owut`、firmware-selector），同时服务 OpenWrt 与 ImmortalWrt。
 
----
+## ✨ 为什么选它
 
-## 核心特性
+| | 原版 ASU | ASU-Go |
+| --- | --- | --- |
+| 部署 | FastAPI + Redis Stack + RQ Worker，至少 3 个容器 | 📦 单二进制，无 Redis |
+| 构建过程 | 黑盒，只能干等 | 📡 SSE 实时日志，分阶段进度 |
+| 运维 | 只读统计页 | 🖥️ 内置后台：任务看板、取消、重试、缓存清理 |
+| 协议 | — | ✅ 公开 API 与请求哈希保持兼容 |
+| 资源 | Python 常驻，内存偏大 | 🪶 Go 单进程，轻量 |
 
-- **单二进制 All-in-One 部署**：
-  - 内置调度引擎与轻量任务队列，单机运行无需部署 Redis 或 RQ Worker。
-  - 内置 Web 管理控制台静态资产（通过 `embed.FS` 嵌入），开箱即用。
-- **全链路实时构建可观测性**：
-  - 直连 Docker / Podman Unix Socket，通过 Hijack 流式读取构建容器的标准输出与错误流。
-  - 支持类似 CI/CD 的实时控制台滚动（基于 SSE / WebSocket）与分阶段构建进度展示。
-- **完善的 Web 管理后台**：
-  - 任务监控看板（运行中、排队中、历史任务、失败溯源）。
-  - 任务生命周期控制（卡死任务强制 Kill 并级联清理底层容器）。
-  - 产物与磁盘缓存管理（固件包过期清理、容量监控）。
-  - 手动在线构建调试器。
-- **100% 协议向后兼容**：
-  - 兼容 OpenWrt 官方 ASU 核心 API（版本元数据同步、Profile 匹配、请求哈希计算、构建轮询协议）。
-- **极低系统资源占用**：
-  - 单进程常驻内存仅需 ~20MB，Goroutine 轻量级高并发。
+- 🔌 **运行时抽象**：Docker / Podman 开箱即用，Kubernetes 接口预留
+- 💾 **SQLite 持久化**：免 CGO，重启后可接管在途构建，容器自动清理
+- ⚡ **包文件缓存**与**包仓库镜像替换**，加速构建、适配国内网络
+- 🌐 **多发行版**：`/openwrt`、`/immortalwrt` 前缀各自独立
 
----
+## 🏁 Quick Start
 
-## 技术栈
+**推荐使用 Docker Compose 部署**（Podman 亦可）。
 
-Go + Gin + Cobra + YAML 配置 + SQLite；前端 Bun + Nuxt 4 (SPA) + Nuxt UI，构建后嵌入二进制；容器运行时经 `Runtime` 接口抽象（Docker / Podman，预留 Kubernetes）。详见 [技术栈与工程约定](docs/tech-stack.md)。
-
-## 多发行版客户端配置
-
-同一实例可同时服务 OpenWrt 和 ImmortalWrt。无前缀 API 使用 `server.default_distro`（默认 `openwrt`）；`/openwrt`、`/immortalwrt` 前缀提供各自独立的元数据及完整公开 API。对应发行版须在 sources 中启用，管理后台地址仍为 `/admin`。
-
-**ImmortalWrt 固件应使用 `http://host:8000/immortalwrt`**，避免获取 OpenWrt 专属版本：
-
-```sh
-owut check --server http://host:8000/immortalwrt
-uci set attendedsysupgrade.server.url='http://host:8000/immortalwrt'
-uci commit attendedsysupgrade
+```bash
+cp configs/asu.compose.yaml asu.yaml   # 按需修改
+mkdir -p data
+docker compose up -d --build          # Podman: podman compose up -d --build
 ```
 
-LuCI 中将 Attended Sysupgrade 的服务器 URL 设为同一地址。仅服务 ImmortalWrt 时也可设 `server.default_distro: immortalwrt`。详见 [API 多发行版与路径前缀](docs/api-spec.md#多发行版与路径前缀)。
+- 公开 API：`http://localhost:8000`
+- 管理后台：`http://localhost:8000/admin`
+- 客户端接入：`owut check --server http://host:8000`（ImmortalWrt 用 `http://host:8000/immortalwrt`）
 
----
+`main` 分支每次提交会发布 `ghcr.io/gzzchh/asu-go:dev` 镜像。管理员账号、rootless Podman、SELinux、反向代理等细节见 [部署文档](docs/development.md#compose-部署)。
 
-## 目录结构规划
+## 📚 文档
 
-```text
-asu-go/
-├── cmd/asu/                  # Cobra 入口
-├── internal/
-│   ├── cli/                  # Cobra 子命令
-│   ├── config/               # YAML 配置加载与校验
-│   ├── api/                  # 兼容原版 ASU 的公开 API
-│   ├── admin/                # 管理后台 API
-│   ├── metadata/             # 上游元数据拉取与缓存
-│   ├── queue/                # 任务队列
-│   ├── runtime/              # 容器运行时抽象与驱动 (docker / podman / k8s 预留)
-│   ├── stream/               # 日志广播与 RingBuffer
-│   ├── store/                # 产物存储
-│   └── db/                   # SQLite 与迁移
-├── web/                      # Bun + Nuxt 项目（dist 嵌入二进制）
-├── docs/                     # 设计文档 / adr / agents
-├── configs/asu.example.yaml
-├── AGENTS.md  GLOSSARY.md  Makefile  go.mod
-└── .scratch/                 # 本地 Markdown issue tracker
-```
+| 主题 | 文档 |
+| --- | --- |
+| 部署与本地开发 | [docs/development.md](docs/development.md) |
+| 系统架构 | [docs/architecture.md](docs/architecture.md) |
+| API 兼容与扩展 | [docs/api-spec.md](docs/api-spec.md) |
+| 容器执行与可观测性 | [docs/runner-and-observability.md](docs/runner-and-observability.md) |
+| 管理后台 | [docs/admin-dashboard.md](docs/admin-dashboard.md) |
+| 数据模型 | [docs/data-model.md](docs/data-model.md) |
+| 技术栈与工程约定 | [docs/tech-stack.md](docs/tech-stack.md) |
+| 术语 / 决策记录 | [GLOSSARY.md](GLOSSARY.md) · [docs/adr/](docs/adr/) |
+| 配置示例 | [configs/asu.example.yaml](configs/asu.example.yaml) |
 
----
+## 🛠️ 技术栈
 
-## 详细技术文档
+Go · Gin · Cobra · YAML 配置 · Zap · SQLite ｜ Bun · Nuxt 4 · Nuxt UI（构建后 `go:embed` 嵌入二进制）
 
-- [技术栈与工程约定 (Tech Stack)](docs/tech-stack.md)
-- [系统架构设计 (Architecture)](docs/architecture.md)
-- [API 兼容与扩展规范 (API Spec)](docs/api-spec.md)
-- [容器执行引擎与实时可观测性 (Runner & Observability)](docs/runner-and-observability.md)
-- [管理后台与任务运维规范 (Admin Dashboard)](docs/admin-dashboard.md)
+## 📄 许可证
+
+[MIT](LICENSE)
+
+## 🤝 参与开发
+
+`make dev` / `make build` / `make test` / `make lint`，约定见 [AGENTS.md](AGENTS.md) 与 [docs/tech-stack.md](docs/tech-stack.md)。
