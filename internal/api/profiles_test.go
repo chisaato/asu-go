@@ -10,8 +10,8 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/gzzchh/asu-go/internal/api"
-	"github.com/gzzchh/asu-go/internal/metadata"
+	"github.com/chisaato/asu-go/internal/api"
+	"github.com/chisaato/asu-go/internal/metadata"
 )
 
 func TestProfileAndIndexCompatibility(t *testing.T) {

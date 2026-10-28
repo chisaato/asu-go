@@ -3,7 +3,7 @@ package api
 import (
 	"context"
 	"github.com/gin-gonic/gin"
-	"github.com/gzzchh/asu-go/internal/store"
+	"github.com/chisaato/asu-go/internal/store"
 	"mime"
 	"net/http"
 	"path"

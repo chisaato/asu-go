@@ -11,9 +11,9 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
-	"github.com/gzzchh/asu-go/internal/admin"
-	"github.com/gzzchh/asu-go/internal/db"
-	"github.com/gzzchh/asu-go/internal/sources"
+	"github.com/chisaato/asu-go/internal/admin"
+	"github.com/chisaato/asu-go/internal/db"
+	"github.com/chisaato/asu-go/internal/sources"
 )
 
 func TestSourceCommandsHTTP(t *testing.T) {

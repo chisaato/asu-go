@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/gzzchh/asu-go/internal/stream"
+	"github.com/chisaato/asu-go/internal/stream"
 )
 
 func TestLogsAuthHistoryFollow(t *testing.T) {

@@ -13,9 +13,9 @@ import (
 	"sync"
 	"time"
 
-	logging "github.com/gzzchh/asu-go/internal/logcontext"
-	"github.com/gzzchh/asu-go/internal/runtime"
-	"github.com/gzzchh/asu-go/internal/stream"
+	logging "github.com/chisaato/asu-go/internal/logcontext"
+	"github.com/chisaato/asu-go/internal/runtime"
+	"github.com/chisaato/asu-go/internal/stream"
 	"go.uber.org/zap"
 )
 

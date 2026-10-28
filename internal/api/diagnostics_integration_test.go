@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gzzchh/asu-go/internal/runner"
-	"github.com/gzzchh/asu-go/internal/runtime"
+	"github.com/chisaato/asu-go/internal/runner"
+	"github.com/chisaato/asu-go/internal/runtime"
 )
 
 // 限定扫描范围，不回收共享 Podman socket 上其他测试或用户的环境。

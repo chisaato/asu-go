@@ -8,7 +8,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/gzzchh/asu-go/internal/config"
+	"github.com/chisaato/asu-go/internal/config"
 	"github.com/spf13/cobra"
 	"golang.org/x/crypto/bcrypt"
 	"gopkg.in/yaml.v3"

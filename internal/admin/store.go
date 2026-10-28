@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/gzzchh/asu-go/internal/queue"
+	"github.com/chisaato/asu-go/internal/queue"
 )
 
 type StorageOverviewResponse struct {

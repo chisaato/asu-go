@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gzzchh/asu-go/internal/sources"
+	"github.com/chisaato/asu-go/internal/sources"
 )
 
 // ProfileProvider 是构建校验可依赖的最小元数据接口，不依赖 HTTP/Gin。

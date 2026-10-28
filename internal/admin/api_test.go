@@ -12,12 +12,12 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/gzzchh/asu-go/internal/config"
-	"github.com/gzzchh/asu-go/internal/db"
-	"github.com/gzzchh/asu-go/internal/queue"
-	"github.com/gzzchh/asu-go/internal/runtime"
-	"github.com/gzzchh/asu-go/internal/store"
-	"github.com/gzzchh/asu-go/internal/stream"
+	"github.com/chisaato/asu-go/internal/config"
+	"github.com/chisaato/asu-go/internal/db"
+	"github.com/chisaato/asu-go/internal/queue"
+	"github.com/chisaato/asu-go/internal/runtime"
+	"github.com/chisaato/asu-go/internal/store"
+	"github.com/chisaato/asu-go/internal/stream"
 	"go.uber.org/zap"
 )
 

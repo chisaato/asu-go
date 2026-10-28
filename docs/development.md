@@ -35,7 +35,7 @@ runtime:
 
 GoLand：
 1. Run → Edit Configurations → + → **Go Build**。
-2. Run kind 选 **Package**，Package path 填 `github.com/gzzchh/asu-go/cmd/asu`。
+2. Run kind 选 **Package**，Package path 填 `github.com/chisaato/asu-go/cmd/asu`。
 3. Program arguments 填 `serve --config asu.yaml`；Working directory 填仓库根目录。
 4. 需要的环境变量（可选）：`ASU_ADMIN_TOKEN=dev-token`。
 5. 调试直接点 Debug 即可；前端另开终端 `cd web && bun run dev`。

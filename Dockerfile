@@ -16,7 +16,7 @@ RUN go mod download
 COPY . .
 COPY --from=web /src/web/dist ./web/dist
 ARG VERSION=dev
-RUN CGO_ENABLED=0 go build -trimpath -ldflags "-s -w -X github.com/gzzchh/asu-go/internal/cli.Version=${VERSION}" -o /out/asu ./cmd/asu
+RUN CGO_ENABLED=0 go build -trimpath -ldflags "-s -w -X github.com/chisaato/asu-go/internal/cli.Version=${VERSION}" -o /out/asu ./cmd/asu
 
 # 阶段三：运行镜像
 FROM docker.io/library/alpine:3

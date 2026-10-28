@@ -14,7 +14,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gzzchh/asu-go/internal/runtime"
+	"github.com/chisaato/asu-go/internal/runtime"
 	"go.uber.org/zap"
 )
 

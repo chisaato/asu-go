@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
-	"github.com/gzzchh/asu-go/internal/store"
+	"github.com/chisaato/asu-go/internal/store"
 )
 
 func TestStoreDownloads(t *testing.T) {

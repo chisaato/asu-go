@@ -1,7 +1,7 @@
 // Package queue 提供持久化任务队列与驱动注册。
 package queue
 
-import "github.com/gzzchh/asu-go/internal/driver"
+import "github.com/chisaato/asu-go/internal/driver"
 
 type Driver interface{ Name() string }
 

@@ -15,10 +15,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gzzchh/asu-go/internal/buildreq"
-	logging "github.com/gzzchh/asu-go/internal/logcontext"
-	"github.com/gzzchh/asu-go/internal/runner"
-	"github.com/gzzchh/asu-go/internal/store"
+	"github.com/chisaato/asu-go/internal/buildreq"
+	logging "github.com/chisaato/asu-go/internal/logcontext"
+	"github.com/chisaato/asu-go/internal/runner"
+	"github.com/chisaato/asu-go/internal/store"
 	"go.uber.org/zap"
 )
 

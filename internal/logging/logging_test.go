@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gzzchh/asu-go/internal/config"
+	"github.com/chisaato/asu-go/internal/config"
 	"go.uber.org/zap"
 )
 

@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
-	"github.com/gzzchh/asu-go/web"
+	"github.com/chisaato/asu-go/web"
 )
 
 // Register 挂载静态后台到 /ui 与 /admin 别名，不占用公开服务与 /admin/api 路由空间。

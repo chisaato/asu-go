@@ -14,8 +14,8 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/gzzchh/asu-go/internal/config"
-	logging "github.com/gzzchh/asu-go/internal/logcontext"
+	"github.com/chisaato/asu-go/internal/config"
+	logging "github.com/chisaato/asu-go/internal/logcontext"
 	"go.uber.org/zap"
 	"golang.org/x/crypto/bcrypt"
 )

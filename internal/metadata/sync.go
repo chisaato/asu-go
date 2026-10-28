@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gzzchh/asu-go/internal/sources"
+	"github.com/chisaato/asu-go/internal/sources"
 	"go.uber.org/zap"
 )
 

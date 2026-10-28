@@ -1,4 +1,4 @@
-module github.com/gzzchh/asu-go
+module github.com/chisaato/asu-go
 
 go 1.26.0
 

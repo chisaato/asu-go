@@ -3,11 +3,11 @@ package driver_test
 import (
 	"testing"
 
-	"github.com/gzzchh/asu-go/internal/driver"
-	"github.com/gzzchh/asu-go/internal/queue"
-	"github.com/gzzchh/asu-go/internal/runtime"
-	"github.com/gzzchh/asu-go/internal/stats"
-	"github.com/gzzchh/asu-go/internal/store"
+	"github.com/chisaato/asu-go/internal/driver"
+	"github.com/chisaato/asu-go/internal/queue"
+	"github.com/chisaato/asu-go/internal/runtime"
+	"github.com/chisaato/asu-go/internal/stats"
+	"github.com/chisaato/asu-go/internal/store"
 )
 
 func TestRegistry(t *testing.T) {

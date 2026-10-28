@@ -3,8 +3,8 @@ package cli
 import (
 	"fmt"
 
-	"github.com/gzzchh/asu-go/internal/config"
-	"github.com/gzzchh/asu-go/internal/db"
+	"github.com/chisaato/asu-go/internal/config"
+	"github.com/chisaato/asu-go/internal/db"
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
 )

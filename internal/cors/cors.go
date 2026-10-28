@@ -7,8 +7,8 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
-	"github.com/gzzchh/asu-go/internal/config"
-	"github.com/gzzchh/asu-go/internal/sources"
+	"github.com/chisaato/asu-go/internal/config"
+	"github.com/chisaato/asu-go/internal/sources"
 )
 
 // New 返回全局中间件；预检在路由和管理鉴权之前结束。

@@ -1,7 +1,7 @@
 // Package store 定义产物存储接口与本地安全存储实现。
 package store
 
-import "github.com/gzzchh/asu-go/internal/driver"
+import "github.com/chisaato/asu-go/internal/driver"
 
 type Driver interface{ Name() string }
 

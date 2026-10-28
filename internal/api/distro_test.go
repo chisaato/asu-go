@@ -12,13 +12,13 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
-	"github.com/gzzchh/asu-go/internal/api"
-	"github.com/gzzchh/asu-go/internal/config"
-	"github.com/gzzchh/asu-go/internal/cors"
-	"github.com/gzzchh/asu-go/internal/metadata"
-	"github.com/gzzchh/asu-go/internal/sources"
-	"github.com/gzzchh/asu-go/internal/store"
-	"github.com/gzzchh/asu-go/internal/webui"
+	"github.com/chisaato/asu-go/internal/api"
+	"github.com/chisaato/asu-go/internal/config"
+	"github.com/chisaato/asu-go/internal/cors"
+	"github.com/chisaato/asu-go/internal/metadata"
+	"github.com/chisaato/asu-go/internal/sources"
+	"github.com/chisaato/asu-go/internal/store"
+	"github.com/chisaato/asu-go/internal/webui"
 )
 
 func TestDistroMetadataMirrors(t *testing.T) {

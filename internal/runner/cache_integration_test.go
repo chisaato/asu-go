@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gzzchh/asu-go/internal/runtime"
-	"github.com/gzzchh/asu-go/internal/stream"
+	"github.com/chisaato/asu-go/internal/runtime"
+	"github.com/chisaato/asu-go/internal/stream"
 )
 
 // 全新容器只播种包，热构建前后逐包比较 mtime/大小，不能靠静默 wget 的日志判断下载量。

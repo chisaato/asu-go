@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
-	"github.com/gzzchh/asu-go/internal/metadata"
+	"github.com/chisaato/asu-go/internal/metadata"
 )
 
 func metadataError(c *gin.Context, err error) {

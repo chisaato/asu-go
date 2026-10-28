@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
-	"github.com/gzzchh/asu-go/internal/sources"
+	"github.com/chisaato/asu-go/internal/sources"
 )
 
 // ValidateCatalog 在启动时检查已有目录（包括旧数据库）与默认发行版。

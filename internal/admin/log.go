@@ -7,7 +7,7 @@ import (
 	"os"
 
 	"github.com/gin-gonic/gin"
-	"github.com/gzzchh/asu-go/internal/stream"
+	"github.com/chisaato/asu-go/internal/stream"
 )
 
 type flushingWriter struct{ writer gin.ResponseWriter }

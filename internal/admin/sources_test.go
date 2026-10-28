@@ -9,8 +9,8 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
-	"github.com/gzzchh/asu-go/internal/db"
-	"github.com/gzzchh/asu-go/internal/sources"
+	"github.com/chisaato/asu-go/internal/db"
+	"github.com/chisaato/asu-go/internal/sources"
 )
 
 func testRouter(t *testing.T, token string) *gin.Engine {

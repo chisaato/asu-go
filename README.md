@@ -33,7 +33,7 @@ docker compose up -d --build          # Podman: podman compose up -d --build
 - 管理后台：`http://localhost:8000/admin`
 - 客户端接入：`owut check --server http://host:8000`（ImmortalWrt 用 `http://host:8000/immortalwrt`）
 
-`main` 分支每次提交会发布 `ghcr.io/gzzchh/asu-go:dev` 镜像。管理员账号、rootless Podman、SELinux、反向代理等细节见 [部署文档](docs/development.md#compose-部署)。
+`main` 分支每次提交会发布 `ghcr.io/chisaato/asu-go:dev` 镜像。管理员账号、rootless Podman、SELinux、反向代理等细节见 [部署文档](docs/development.md#compose-部署)。
 
 ## 📚 文档
 

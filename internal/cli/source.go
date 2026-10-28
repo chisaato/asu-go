@@ -12,8 +12,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gzzchh/asu-go/internal/config"
-	"github.com/gzzchh/asu-go/internal/sources"
+	"github.com/chisaato/asu-go/internal/config"
+	"github.com/chisaato/asu-go/internal/sources"
 	"github.com/spf13/cobra"
 )
 

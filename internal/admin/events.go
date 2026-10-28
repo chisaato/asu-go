@@ -11,10 +11,10 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/gzzchh/asu-go/internal/config"
-	"github.com/gzzchh/asu-go/internal/queue"
-	"github.com/gzzchh/asu-go/internal/runtime"
-	"github.com/gzzchh/asu-go/internal/stream"
+	"github.com/chisaato/asu-go/internal/config"
+	"github.com/chisaato/asu-go/internal/queue"
+	"github.com/chisaato/asu-go/internal/runtime"
+	"github.com/chisaato/asu-go/internal/stream"
 )
 
 // RegisterEvents 注册全局与单任务 SSE 事件流。

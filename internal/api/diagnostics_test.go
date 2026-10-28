@@ -11,9 +11,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gzzchh/asu-go/internal/admin"
-	"github.com/gzzchh/asu-go/internal/buildreq"
-	"github.com/gzzchh/asu-go/internal/runner"
+	"github.com/chisaato/asu-go/internal/admin"
+	"github.com/chisaato/asu-go/internal/buildreq"
+	"github.com/chisaato/asu-go/internal/runner"
 )
 
 func diagnosticsHarness(t *testing.T) *buildHarness {

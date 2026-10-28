@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
-	"github.com/gzzchh/asu-go/internal/config"
+	"github.com/chisaato/asu-go/internal/config"
 )
 
 func TestMiddleware(t *testing.T) {

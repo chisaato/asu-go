@@ -11,8 +11,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gzzchh/asu-go/internal/db"
-	"github.com/gzzchh/asu-go/internal/runtime"
+	"github.com/chisaato/asu-go/internal/db"
+	"github.com/chisaato/asu-go/internal/runtime"
 )
 
 // memoryJobs 是队列未接入时的最小测试实现；锁保护并行接管的收尾。

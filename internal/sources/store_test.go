@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gzzchh/asu-go/internal/db"
+	"github.com/chisaato/asu-go/internal/db"
 )
 
 func testStore(t *testing.T) *Store {

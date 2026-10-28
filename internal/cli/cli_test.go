@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gzzchh/asu-go/internal/config"
-	"github.com/gzzchh/asu-go/internal/db"
+	"github.com/chisaato/asu-go/internal/config"
+	"github.com/chisaato/asu-go/internal/db"
 )
 
 func TestCommands(t *testing.T) {

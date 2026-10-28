@@ -11,11 +11,11 @@ import (
 	"strings"
 	"time"
 
-	logging "github.com/gzzchh/asu-go/internal/logcontext"
+	logging "github.com/chisaato/asu-go/internal/logcontext"
 	"go.uber.org/zap"
 
-	"github.com/gzzchh/asu-go/internal/buildreq"
-	"github.com/gzzchh/asu-go/internal/runner"
+	"github.com/chisaato/asu-go/internal/buildreq"
+	"github.com/chisaato/asu-go/internal/runner"
 )
 
 type ReplayOptions struct {

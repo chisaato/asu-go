@@ -16,8 +16,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gzzchh/asu-go/internal/runtime"
-	"github.com/gzzchh/asu-go/internal/stream"
+	"github.com/chisaato/asu-go/internal/runtime"
+	"github.com/chisaato/asu-go/internal/stream"
 	"golang.org/x/sync/errgroup"
 )
 

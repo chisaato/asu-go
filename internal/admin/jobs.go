@@ -9,8 +9,8 @@ import (
 	"strconv"
 
 	"github.com/gin-gonic/gin"
-	"github.com/gzzchh/asu-go/internal/buildreq"
-	"github.com/gzzchh/asu-go/internal/queue"
+	"github.com/chisaato/asu-go/internal/buildreq"
+	"github.com/chisaato/asu-go/internal/queue"
 )
 
 // RegisterJobs 仅挂载到已鉴权的管理路由组。

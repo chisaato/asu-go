@@ -8,8 +8,8 @@ import (
 	"os"
 	"testing"
 
-	"github.com/gzzchh/asu-go/internal/runner"
-	"github.com/gzzchh/asu-go/internal/runtime"
+	"github.com/chisaato/asu-go/internal/runner"
+	"github.com/chisaato/asu-go/internal/runtime"
 )
 
 func TestPodmanBuildSubmitPoll(t *testing.T) {

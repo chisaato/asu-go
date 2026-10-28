@@ -14,7 +14,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gzzchh/asu-go/internal/runtime"
+	"github.com/chisaato/asu-go/internal/runtime"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zaptest/observer"
 )

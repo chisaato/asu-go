@@ -1,8 +1,8 @@
 package queue
 
 import (
-	"github.com/gzzchh/asu-go/internal/buildreq"
-	"github.com/gzzchh/asu-go/internal/pkgchanges"
+	"github.com/chisaato/asu-go/internal/buildreq"
+	"github.com/chisaato/asu-go/internal/pkgchanges"
 )
 
 // executionPackages 在哈希和持久化原请求后、Runner 的差异包计算前应用规则。

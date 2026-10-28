@@ -3,7 +3,7 @@ package main
 import (
 	"os"
 
-	"github.com/gzzchh/asu-go/internal/cli"
+	"github.com/chisaato/asu-go/internal/cli"
 )
 
 func main() {

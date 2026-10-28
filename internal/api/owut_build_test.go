@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/gzzchh/asu-go/internal/buildreq"
-	"github.com/gzzchh/asu-go/internal/sources"
+	"github.com/chisaato/asu-go/internal/buildreq"
+	"github.com/chisaato/asu-go/internal/sources"
 )
 
 func owutFixture(t *testing.T, name string) []byte {

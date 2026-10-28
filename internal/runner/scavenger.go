@@ -6,8 +6,8 @@ import (
 	"sort"
 	"time"
 
-	logging "github.com/gzzchh/asu-go/internal/logcontext"
-	"github.com/gzzchh/asu-go/internal/runtime"
+	logging "github.com/chisaato/asu-go/internal/logcontext"
+	"github.com/chisaato/asu-go/internal/runtime"
 	"go.uber.org/zap"
 )
 

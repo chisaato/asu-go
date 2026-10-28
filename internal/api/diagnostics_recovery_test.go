@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gzzchh/asu-go/internal/runtime"
+	"github.com/chisaato/asu-go/internal/runtime"
 )
 
 func TestReplaySuccessfulArtifactsPrivate(t *testing.T) {

@@ -5,7 +5,7 @@ import (
 	"sync"
 	"time"
 
-	logging "github.com/gzzchh/asu-go/internal/logcontext"
+	logging "github.com/chisaato/asu-go/internal/logcontext"
 	"go.uber.org/zap"
 )
 

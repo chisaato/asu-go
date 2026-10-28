@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/gzzchh/asu-go/internal/logcontext"
+	"github.com/chisaato/asu-go/internal/logcontext"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )

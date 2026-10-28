@@ -11,7 +11,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/gzzchh/asu-go/internal/db"
+	"github.com/chisaato/asu-go/internal/db"
 )
 
 //go:embed defaults.yaml
