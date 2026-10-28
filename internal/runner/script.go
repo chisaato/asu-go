@@ -9,6 +9,28 @@ import (
 
 func quote(s string) string { return "'" + strings.ReplaceAll(s, "'", "'\"'\"'") + "'" }
 
+type Mirror struct {
+	From, To string
+}
+
+// 镜像仅修改 setup 后的原始仓库，自定义仓库随后覆盖或追加，保留请求方的明确地址。
+func mirrorScript(mirrors []Mirror) string {
+	if len(mirrors) == 0 {
+		return ""
+	}
+	var b strings.Builder
+	b.WriteString("if [ -f repositories ]; then repo=repositories; else repo=repositories.conf; fi\n")
+	pattern := strings.NewReplacer(`\`, `\\`, `.`, `\.`, `[`, `\[`, `*`, `\*`, `^`, `\^`, `$`, `\$`, `#`, `\#`)
+	replacement := strings.NewReplacer(`\`, `\\`, `&`, `\&`, `#`, `\#`)
+	for _, mirror := range mirrors {
+		// BRE 的分组与行首/空白边界仅由代码生成，URL 本身全部按字面量匹配。
+		expr := `s#\(^\|[[:space:]]\)` + pattern.Replace(mirror.From) + `#\1` + replacement.Replace(mirror.To) + `#g`
+		fmt.Fprintf(&b, "sed -i %s \"$repo\"\n", quote(expr))
+	}
+	fmt.Fprintf(&b, "printf '##asu:mirrors=%d\\n'\n", len(mirrors))
+	return b.String()
+}
+
 func workingDir(dir string) string {
 	if dir == "" {
 		return "/builder"
@@ -20,6 +42,12 @@ func workingDir(dir string) string {
 func Script(j Job) (string, error) {
 	values := []string{j.ID, j.Image, j.Profile, j.VersionCode, j.Defaults, j.Filesystem, j.WorkingDir}
 	values = append(values, j.Packages...)
+	for _, mirror := range j.Mirrors {
+		values = append(values, mirror.From, mirror.To)
+		if strings.ContainsAny(mirror.From+mirror.To, "\r\n") {
+			return "", fmt.Errorf("镜像前缀包含换行")
+		}
+	}
 	for k, v := range j.PackageVersions {
 		values = append(values, k, v)
 	}
@@ -36,6 +64,7 @@ func Script(j Job) (string, error) {
 	if j.Setup {
 		b.WriteString("sh setup.sh\n")
 	}
+	b.WriteString(mirrorScript(j.Mirrors))
 	if len(j.Repositories) > 0 {
 		b.WriteString("if [ -f repositories ]; then repo=repositories; custom=.asu-repositories-apk; else repo=repositories.conf; custom=.asu-repositories-opkg; fi\n")
 		if j.RepositoriesMode == "append" {

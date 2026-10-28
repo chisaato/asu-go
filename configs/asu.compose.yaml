@@ -29,6 +29,8 @@ runtime:
   # 容器内路径；由 compose.yaml 把宿主引擎 socket 挂到这里。Podman 同样使用 docker 驱动。
   socket: unix:///var/run/docker.sock
 runner:
+  # 仅替换原始仓库；USTC 映射示例见 asu.example.yaml。
+  mirrors: []
   verbose: true
   cache:
     enabled: true

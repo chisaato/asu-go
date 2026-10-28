@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"path"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -23,6 +24,7 @@ type Stage struct {
 	At   time.Time `json:"at"`
 }
 type Job struct {
+	Mirrors                         []Mirror
 	Distribution, Version, Target   string
 	ID, Image, Profile, VersionCode string
 	// WorkingDir 由 Runner 从镜像或接管容器元数据填入，不接受公开请求覆盖。
@@ -66,6 +68,7 @@ func (e *Error) Error() string {
 func (e *Error) Unwrap() error { return e.Cause }
 
 type Runner struct {
+	Mirrors        []Mirror
 	Logger         *zap.Logger
 	Runtime        runtime.Runtime
 	Hub            *stream.Hub
@@ -231,6 +234,7 @@ func (r *Runner) execute(parent context.Context, j Job, existing runtime.Handle)
 		j.WorkingDir = workingDir(metadata.WorkingDir)
 		j.inputUID, j.inputGID = archiveOwner(metadata.User, log)
 		j.Verbose = j.Verbose || r.Verbose
+		j.Mirrors = r.Mirrors
 		log.Info("构建镜像元数据", zap.String("image", j.Image), zap.String("working_dir", j.WorkingDir), zap.String("user", metadata.User))
 		buildScript := r.BuildScript
 		if buildScript == nil {
@@ -291,6 +295,11 @@ func (r *Runner) execute(parent context.Context, j Job, existing runtime.Handle)
 		}
 		if err = r.Hub.Append(j.ID, line+"\n"); err != nil {
 			return result, err
+		}
+		if count, ok := strings.CutPrefix(line, "##asu:mirrors="); ok && existing == "" {
+			if n, parseErr := strconv.Atoi(count); parseErr == nil && n == len(r.Mirrors) && n > 0 {
+				log.Info(fmt.Sprintf("已应用 %d 条镜像替换", n), zap.Int("mirror_count", n))
+			}
 		}
 		if name, ok := strings.CutPrefix(line, "##asu:stage="); ok && validStage(name) {
 			if name != lastStage {

@@ -103,6 +103,9 @@ func runServe(parent context.Context, cfg config.Config) error {
 	}
 	packageCache := &runner.PackageCache{Enabled: cfg.Runner.Cache.Enabled, Dir: cfg.CacheDir(), MaxBytes: cfg.Runner.Cache.MaxSizeGB * (1 << 30), Logger: logger}
 	buildRunner := &runner.Runner{Logger: logger, Runtime: rt, Hub: hub, JobTimeout: cfg.Queue.JobTimeout, RollingRecheck: cfg.Runtime.RollingRecheck, Verbose: cfg.Runner.Verbose, Cache: packageCache}
+	for _, mirror := range cfg.Runner.Mirrors {
+		buildRunner.Mirrors = append(buildRunner.Mirrors, runner.Mirror{From: mirror.From, To: mirror.To})
+	}
 	jobs := queue.NewSQLite(database.DB, catalog, meta, buildRunner, queue.Options{
 		Logger: logger, DataDir: cfg.DataDir, MaxConcurrentBuilds: cfg.Queue.MaxConcurrentBuilds, MaxPendingJobs: cfg.Queue.MaxPendingJobs,
 		BuildTTL: cfg.Queue.BuildTTL, BuildUnversionedTTL: cfg.Queue.BuildUnversionedTTL, BuildDefaultsTTL: cfg.Queue.BuildDefaultsTTL, BuildFailureTTL: cfg.Queue.BuildFailureTTL, Retention: cfg.Diagnostics.Retention,

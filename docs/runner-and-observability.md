@@ -133,6 +133,35 @@ Cleaner 在现有周期内扫描包文件总大小，超限按 mtime 从旧到�
 
 ---
 
+### 3.7 构建仓库镜像
+
+`runner.mirrors: []` 默认关闭。每项含 `from` / `to`，仅允许以 `/` 结尾的 HTTP(S) URL 前缀；拒绝空主机、控制字符及空白。示例：
+
+```yaml
+runner:
+  mirrors:
+    - from: https://downloads.immortalwrt.org/
+      to: https://mirrors.ustc.edu.cn/immortalwrt/
+    - from: https://downloads.openwrt.org/
+      to: https://mirrors.ustc.edu.cn/openwrt/
+```
+
+顺序固定为：可选 `setup.sh` → 原始仓库镜像替换 → 自定义仓库 replace/append → `make info`。这是保守选择：请求明确提供的自定义地址不应被服务端悄悄替换；append 时原始行使用镜像、自定义行保持原样，replace 时最终全部使用自定义仓库。apk 检测 `repositories`，否则使用 opkg 的 `repositories.conf`。仅匹配行首或空白后的 URL 前缀，不替换其他 URL 中间包含的字符串；规则按配置顺序执行，可能级联，`N` 表示成功执行的规则数，不是命中行数。原始仓库的注释中若出现独立 URL 也可能替换，但不改变包管理行为。
+
+sed 的 BRE 匹配与 replacement 分别转义（含 `#` 分隔符、反斜杠、`&`），整个表达式再用 shell 单引号安全传参（单引号本身拆分转义），不执行配置中的 shell 字符。替换成功后输出 `##asu:mirrors=N`，Runner 写 Zap info「已应用 N 条镜像替换」，保留 `component=runner` / `request_hash` 和 `mirror_count`；空列表不生成替换或日志。接管任务不重放脚本，也不重复记录镜像应用日志。包缓存仅存包文件、不存索引，镜像替换不改变缓存键。
+
+2026-10-28 本机 `curl -L` 实测（保留 shell 的 `https_proxy=http://127.0.0.1:19261`，不是直连结果），以下 USTC OpenWrt 路径均返回 **HTTP 200**：
+
+- `https://mirrors.ustc.edu.cn/openwrt/releases/25.12.6/packages/aarch64_cortex-a53/base/packages.adb`
+- `https://mirrors.ustc.edu.cn/openwrt/releases/25.12.6/targets/mediatek/filogic/packages/packages.adb`
+- `https://mirrors.ustc.edu.cn/openwrt/releases/25.12.6/targets/mediatek/filogic/kmods/`
+
+前两个响应为 `application/octet-stream`，大小分别为 110760 / 14418 字节；kmods 返回真实目录列表，包含 `6.12.112-1-f0a7348f9cb959e1bf4d0447669b031e/`，不是仅状态码为 200 的错误页。
+
+同日执行 `go test -tags integration ./internal/runner -run '^TestMirrorsPodman$' -v -timeout 15m`：本机 Podman 中 `docker.io/immortalwrt/imagebuilder:mediatek-filogic-openwrt-25.12.2` 与 `ghcr.io/openwrt/imagebuilder:mediatek-filogic-v25.12.6` 均通过。使用生成脚本的实际镜像替换片段，`cat repositories` 确认全部上游仓库改为 USTC，`make info` 与 `make manifest PROFILE=bananapi_bpi-r3 PACKAGES=base-files STRIP_ABI=1` 均成功；分别耗时约 74 / 78 秒。容器使用 host 网络并继承本机代理，未宣称直连性能；该冒烟不执行完整固件构建。
+
+metadata 不受此配置影响：内嵌 sources 默认仍为 `https://downloads.openwrt.org` / `https://downloads.immortalwrt.org`；同步器和 profiles/包索引读取各 source 的 `upstream_url`。若希望元数据也走镜像，使用管理来源编辑（或 `asu source edit`）修改对应 source 的 `upstream_url`（例如 `https://mirrors.ustc.edu.cn/openwrt`），编辑会在 sources 表 `overrides` 中记录 `upstream_url`，后续同步保留该覆盖。只影响被编辑的来源，不自动修改同发行版其他来源；本功能不改 metadata。
+
 ## 4. 任务取消与孤儿容器级联清理 (Anti-Zombie)
 
 在原版 Python 实现中，如果服务发生异常崩溃或重启，正在运行的 Podman 构建容器会变成孤儿容器留在系统中，持续占用 CPU 和内存。

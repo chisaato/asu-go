@@ -173,6 +173,8 @@ K8S 预留要点（现在就遵守，避免日后返工）：
 
 `runner.verbose` 默认 true，仅向 `make image` 添加 `V=s`（与任务显式 verbose 取或）。`runner.cache.enabled` 默认 true，`dir` 留空时延迟解析为 `{data_dir}/cache`，`max_size_gb` 默认 20、允许 0。缓存经 Runtime 的 put/get_archive 在任务私有 `WorkingDir/dl` 与共享包仓库之间复制，只保留非空普通 `.apk`/`.ipk`，索引从不跨任务共享。镜像引用去除 digest 并清洗为目录键；自定义 repositories 请求跳过缓存，失败构建不回收，缓存故障不阻断构建。Cleaner 共用 Cache 对象的进程内互斥，按播种时 touch 的文件 mtime LRU 淘汰；不支持多服务进程共享写同一目录。详见 [ADR 0005](adr/0005-package-cache.md) 与 [Runner 包缓存](runner-and-observability.md#36-跨任务包缓存)。
 
+`runner.mirrors` 默认空列表，每项为强类型 `from` / `to` HTTP(S) URL 前缀，均要求以 `/` 结尾。在 setup 后、请求自定义仓库应用前、`make info` 前按顺序替换原始仓库 URL 前缀，明确保留用户自定义地址；不改变包缓存键，不影响 metadata 同步。USTC 示例见 `configs/asu.example.yaml`，安全边界与实测见 [Runner 仓库镜像](runner-and-observability.md#37-构建仓库镜像)。
+
 ---
 
 ## 5. 前端（`web/`）

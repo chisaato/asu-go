@@ -61,6 +61,13 @@ runtime:
   rolling_recheck: 6h
   scavenger_interval: 5m
 runner:
+  # 默认不替换；只替换原始仓库，不修改请求中明确指定的自定义仓库。
+  # mirrors:
+  #   - from: https://downloads.immortalwrt.org/
+  #     to: https://mirrors.ustc.edu.cn/immortalwrt/
+  #   - from: https://downloads.openwrt.org/
+  #     to: https://mirrors.ustc.edu.cn/openwrt/
+  mirrors: []
   # 默认详细输出 make image；诊断请求的 verbose 仍可独立开启。
   verbose: true
   cache:

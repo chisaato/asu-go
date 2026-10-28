@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -119,6 +120,12 @@ type Runtime struct {
 type Runner struct {
 	Verbose bool         `yaml:"verbose"`
 	Cache   PackageCache `yaml:"cache"`
+	Mirrors []Mirror     `yaml:"mirrors"`
+}
+
+type Mirror struct {
+	From string `yaml:"from"`
+	To   string `yaml:"to"`
 }
 
 type PackageCache struct {
@@ -158,7 +165,7 @@ func Default() Config {
 		Cleaner:     Cleaner{Interval: 10 * time.Minute, OrphanGrace: time.Hour},
 		Stats:       Stats{Driver: "sqlite"},
 		Runtime:     Runtime{Driver: "docker", Socket: "unix:///var/run/docker.sock", PullPolicy: "missing", RollingRecheck: 6 * time.Hour, ScavengerInterval: 5 * time.Minute},
-		Runner:      Runner{Verbose: true, Cache: PackageCache{Enabled: true, MaxSizeGB: 20}},
+		Runner:      Runner{Verbose: true, Cache: PackageCache{Enabled: true, MaxSizeGB: 20}, Mirrors: []Mirror{}},
 		Metadata:    Metadata{RefreshInterval: time.Hour, CacheTTL: time.Hour},
 		Diagnostics: Diagnostics{Retention: 7 * 24 * time.Hour, KeepContainerTTL: time.Hour, MaxKept: 3},
 	}
@@ -250,6 +257,14 @@ func Load(path string, flags Overrides) (Config, error) {
 }
 
 func (c Config) Validate() error {
+	for i, mirror := range c.Runner.Mirrors {
+		for key, value := range map[string]string{"from": mirror.From, "to": mirror.To} {
+			u, err := url.Parse(value)
+			if err != nil || u.Host == "" || (u.Scheme != "http" && u.Scheme != "https") || !strings.HasSuffix(value, "/") || strings.ContainsAny(value, "\x00\r\n\t ") {
+				return fmt.Errorf("runner.mirrors[%d].%s: 必须为以 / 结尾的 http/https URL 前缀", i, key)
+			}
+		}
+	}
 	if c.Runner.Cache.MaxSizeGB < 0 || c.Runner.Cache.MaxSizeGB > (1<<63-1)/(1<<30) {
 		return errors.New("runner.cache.max_size_gb: 必须为非负且可表示字节数的整数")
 	}
