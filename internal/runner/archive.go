@@ -37,7 +37,10 @@ func archiveOwner(user string, log *zap.Logger) (int, int) {
 }
 
 func inputs(j Job) ([]byte, error) {
-	files := map[string]string{}
+	files, err := apkABIInputs()
+	if err != nil {
+		return nil, err
+	}
 	if j.Defaults != "" {
 		files["asu-files/etc/uci-defaults/99-asu-defaults"] = j.Defaults
 	}

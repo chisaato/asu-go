@@ -146,7 +146,7 @@ runner:
       to: https://mirrors.ustc.edu.cn/openwrt/
 ```
 
-顺序固定为：可选 `setup.sh` → 原始仓库镜像替换 → 自定义仓库 replace/append → `make info`。这是保守选择：请求明确提供的自定义地址不应被服务端悄悄替换；append 时原始行使用镜像、自定义行保持原样，replace 时最终全部使用自定义仓库。apk 检测 `repositories`，否则使用 opkg 的 `repositories.conf`。仅匹配行首或空白后的 URL 前缀，不替换其他 URL 中间包含的字符串；规则按配置顺序执行，可能级联，`N` 表示成功执行的规则数，不是命中行数。原始仓库的注释中若出现独立 URL 也可能替换，但不改变包管理行为。
+顺序固定为：可选 `setup.sh` → 原始仓库镜像替换 → 自定义仓库 replace/append → ImageBuilder 运行时补丁 → `make info`。这是保守选择：请求明确提供的自定义地址不应被服务端悄悄替换；append 时原始行使用镜像、自定义行保持原样，replace 时最终全部使用自定义仓库。apk 检测 `repositories`，否则使用 opkg 的 `repositories.conf`。仅匹配行首或空白后的 URL 前缀，不替换其他 URL 中间包含的字符串；规则按配置顺序执行，可能级联，`N` 表示成功执行的规则数，不是命中行数。原始仓库的注释中若出现独立 URL 也可能替换，但不改变包管理行为。
 
 sed 的 BRE 匹配与 replacement 分别转义（含 `#` 分隔符、反斜杠、`&`），整个表达式再用 shell 单引号安全传参（单引号本身拆分转义），不执行配置中的 shell 字符。替换成功后输出 `##asu:mirrors=N`，Runner 写 Zap info「已应用 N 条镜像替换」，保留 `component=runner` / `request_hash` 和 `mirror_count`；空列表不生成替换或日志。接管任务不重放脚本，也不重复记录镜像应用日志。包缓存仅存包文件、不存索引，镜像替换不改变缓存键。
 
@@ -161,6 +161,18 @@ sed 的 BRE 匹配与 replacement 分别转义（含 `#` 分隔符、反斜杠�
 同日执行 `go test -tags integration ./internal/runner -run '^TestMirrorsPodman$' -v -timeout 15m`：本机 Podman 中 `docker.io/immortalwrt/imagebuilder:mediatek-filogic-openwrt-25.12.2` 与 `ghcr.io/openwrt/imagebuilder:mediatek-filogic-v25.12.6` 均通过。使用生成脚本的实际镜像替换片段，`cat repositories` 确认全部上游仓库改为 USTC，`make info` 与 `make manifest PROFILE=bananapi_bpi-r3 PACKAGES=base-files STRIP_ABI=1` 均成功；分别耗时约 74 / 78 秒。容器使用 host 网络并继承本机代理，未宣称直连性能；该冒烟不执行完整固件构建。
 
 metadata 不受此配置影响：内嵌 sources 默认仍为 `https://downloads.openwrt.org` / `https://downloads.immortalwrt.org`；同步器和 profiles/包索引读取各 source 的 `upstream_url`。若希望元数据也走镜像，使用管理来源编辑（或 `asu source edit`）修改对应 source 的 `upstream_url`（例如 `https://mirrors.ustc.edu.cn/openwrt`），编辑会在 sources 表 `overrides` 中记录 `upstream_url`，后续同步保留该覆盖。只影响被编辑的来源，不自动修改同发行版其他来源；本功能不改 metadata。
+
+### 3.8 ImageBuilder 运行时补丁
+
+补丁源码位于 `internal/runner/assets/apk-abi/`，通过 `go:embed` 随单一二进制分发，不把 Python 或 Makefile 补丁内联成 Go 字符串。Runner 沿用 `PutArchive`，在启动前将资源注入镜像工作目录下的 `.asu/patches/apk-abi/`；不挂载宿主文件，也不重建 ImageBuilder 或容器镜像。资源和缓存留在任务私有容器中，不放进 `asu-files/` 或固件输出目录。
+
+启动脚本在仓库配置完成后调用 `python3 .asu/patches/apk-abi/apply.py`。首版 `guard.json` 收录 ImmortalWrt 25.12.2 mediatek/filogic 镜像的 `Makefile`、`include/rootfs.mk`、`rules.mk` 完整 SHA256，以及替换后的 Makefile SHA256；镜像引用与 digest 仅用于溯源，实际按源码指纹匹配。补丁原子替换唯一的 `GetABISuffix`，重复执行不会再次修改。源码不匹配或缺少 Python 3 时告警跳过，不猜测未知版本的内部规则。应用过程的意外失败不会被启动脚本吞掉。
+
+优化仅针对 ABI 后缀的只读 `apk query`：移除该路径的 fakeroot 包装，保留原有查询参数与后缀提取规则，并在任务内缓存成功查询的正、负结果。缓存需随查询参数及仓库索引、密钥、安装数据库等上下文变化失效；查询失败不缓存，缓存故障降级为直接查询。不跨任务共享 ABI 缓存，也不沿用跨任务包缓存的镜像目录键。
+
+缓存环境指纹仅排除明确与 APK 查询无关的 make 传递变量和输出参数（`MAKEFLAGS`、`MFLAGS`、`MAKELEVEL`、`MAKEOVERRIDES`、`STRIP_ABI`、`BIN_DIR`、`EXTRA_IMAGE_NAME`、`V`），避免两个阶段因构建参数不同而无法命中；其余环境变量仍参与指纹。未知选项、无法识别的仓库语法或缺失上下文直接查询，不强行缓存。
+
+`apk add`、manifest 的已安装包查询、rootfs 准备和固件生成规则保持原样；不批量替代 `--match provides`，不复用两阶段 rootfs。性能收益以目标环境实测为准，不能从历史诊断脚本直接推导正式实现的耗时。
 
 ## 4. 任务取消与孤儿容器级联清理 (Anti-Zombie)
 

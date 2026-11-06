@@ -8,6 +8,7 @@
 - `Profile`、`Packages` 为规范化后的构建选择；差异包计算与仓库 allow-list 属于上层。`PackageVersions` 对 manifest 的包名及版本做严格校验，`VersionCode` 非空时校验 ImageBuilder revision。
 - `Defaults` 注入 `asu-files/etc/uci-defaults/99-asu-defaults`；`Repositories` 为名称到 URL 的映射，`RepositoriesMode=append` 保留镜像仓库，否则替换。启动脚本检测 apk/opkg，空仓库和空公钥列表不会注入相应文件。`RepositoryKeys` 支持 PEM 与 usign 公钥。
 - `Setup=true` 在 `make info` 前运行镜像的 `setup.sh`；快照所需变量由 `Env` 传入。支持 `RootFSSizeMB`、`Filesystem`、`Verbose`。
+- ImageBuilder 运行时补丁独立存放在 `assets/`，由 `go:embed` 嵌入二进制，经输入归档注入任务私有的 `.asu/patches/`，不依赖宿主 bind mount，也不需要重建 ImageBuilder。补丁在 setup、镜像站及自定义仓库处理之后、`make info` 之前执行；源码不匹配或缺少 Python 3 时跳过，保留原版行为。资源不放入 `asu-files/`，不会作为自定义文件写入固件。
 - `ArtifactDir` 必须指定，建议使用任务专属空临时目录：成功后再由存储层发布，失败后由调用方删除临时目录。Runner 拒绝 tar 路径穿越、链接及特殊文件，普通文件修正为 0644，新建目录为 0755。
 - `OnHandle(ctx, handle)` 在 Create 后、输入注入前调用，用于同步持久化不透明句柄。`OnStage(ctx, Stage{Name, At})` 按日志标记顺序调用，用于更新 `jobs.stage/stages`；回调错误会终止任务并清理。回调应迅速返回并遵守 context。
 - `Result` 返回 `Handle`、`Stages`、`ExitCode`、`ArtifactDir`。句柄成功时也返回，但对应资源已经删除。未获得退出码时 `ExitCode=-1`。
@@ -39,4 +40,14 @@
 ASU_TEST_RUNTIME_DRIVER=podman ASU_TEST_RUNTIME_SOCKET=unix:///var/run/docker.sock go test -tags integration ./internal/runner/...
 ```
 
-测试只使用 alpine 中的模拟 make 脚本，不拉取真实 ImageBuilder。
+常规 Runner 流程测试使用 Alpine 中的模拟 make；`TestPodmanImageBuilderSetup` 另用本地真实镜像验证注入与 `make info`，不下载包。
+
+APK ABI 补丁的默认回归由 `go test ./internal/runner -run 'TestAPKABI' -v` 执行，需要 Python 3 与 GNU make；依赖缺失时明确跳过。完整真实固件对照须显式开启，并要求镜像已在本地、仓库索引可下载：
+
+```sh
+ASU_TEST_APK_ABI_IMAGE=docker.io/immortalwrt/imagebuilder:mediatek-filogic-openwrt-25.12.2 \
+ASU_TEST_RUNTIME_DRIVER=podman ASU_TEST_RUNTIME_SOCKET=unix:///var/run/docker.sock \
+go test -tags integration ./internal/runner -run '^TestAPKABIImageBuilderComparison$' -count=1 -v -timeout 35m
+```
+
+对照测试串行运行原版与补丁版，比较 manifest、存在时的 profiles.json 及 sysupgrade 固件字节；两次下载缓存状态不同，不能据此声称公平性能收益。未完成构建或只验证 `make info`，均不代表固件产物一致性已验证。

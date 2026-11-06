@@ -175,6 +175,8 @@ K8S 预留要点（现在就遵守，避免日后返工）：
 
 `runner.mirrors` 默认空列表，每项为强类型 `from` / `to` HTTP(S) URL 前缀，均要求以 `/` 结尾。在 setup 后、请求自定义仓库应用前、`make info` 前按顺序替换原始仓库 URL 前缀，明确保留用户自定义地址；不改变包缓存键，不影响 metadata 同步。USTC 示例见 `configs/asu.example.yaml`，安全边界与实测见 [Runner 仓库镜像](runner-and-observability.md#37-构建仓库镜像)。
 
+ImageBuilder 运行时补丁采用独立资源文件与 `go:embed`，通过现有 `PutArchive` 注入任务私有工作目录，在仓库配置后、`make info` 前检查并应用。仅匹配已验证源码形态，不依赖宿主 bind mount、不重建镜像；首个补丁优化只读 APK ABI 查询，不改变安装与打包规则。详见 [运行时补丁](runner-and-observability.md#38-imagebuilder-运行时补丁)。
+
 ---
 
 ## 5. 前端（`web/`）

@@ -74,6 +74,7 @@ func Script(j Job) (string, error) {
 		}
 		b.WriteString("if [ \"$repo\" = repositories.conf ]; then\n  grep -F 'src imagebuilder file:packages' \"$repo\" >/dev/null || printf '%s\\n' 'src imagebuilder file:packages' >> \"$repo\"\n  grep -F 'option check_signature' \"$repo\" >/dev/null || printf '%s\\n' 'option check_signature' >> \"$repo\"\nfi\n")
 	}
+	b.WriteString("if command -v python3 >/dev/null 2>&1; then\n  python3 .asu/patches/apk-abi/apply.py\nelse\n  printf '%s\\n' '[asu] 未找到 python3，跳过 APK ABI 查询优化' >&2\nfi\n")
 	b.WriteString("capture .asu-info make info\nstage validate_revision\n")
 	if j.VersionCode != "" {
 		fmt.Fprintf(&b, "revision=$(sed -n 's/.*Current Revision: \"\\(.*\\)\".*/\\1/p' .asu-info)\n[ \"$revision\" = %s ] || { echo 'Received incorrect version'; exit 1; }\n", quote(j.VersionCode))

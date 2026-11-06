@@ -100,7 +100,7 @@ func TestMirrorsPreserveCustomRepositories(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			fragment, _, _ := strings.Cut(script, "capture .asu-info make info")
+			fragment, _, _ := strings.Cut(script, "if command -v python3")
 			cmd := exec.Command("sh", "-c", fragment)
 			cmd.Dir = dir
 			if out, err := cmd.CombinedOutput(); err != nil {

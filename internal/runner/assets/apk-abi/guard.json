@@ -1,0 +1,17 @@
+[
+  {
+    "name": "ImmortalWrt 25.12.2 mediatek-filogic",
+    "source": {
+      "image": "docker.io/immortalwrt/imagebuilder:mediatek-filogic-openwrt-25.12.2",
+      "image_id": "7b2e471fb55a13b1e6c711c7189848369f65b87fae837b774e07a38808429659",
+      "manifest_digest": "sha256:f36c2e730fe0a9cf821f95cf9c954e5990c34c13116b9efb9498cad381461130"
+    },
+    "files": {
+      "Makefile": "bd416789cb36c42e8367ddfbb3b98c9b121dfecf22cd55505b4b0a7dbf791153",
+      "include/rootfs.mk": "502ee81027a310f84345471c27c2c6d3ee212456bda6da5e1e7410f8c24d669d",
+      "rules.mk": "11a51c7597da4d013e24b3e670e6760f2392e258b90951bba2db2b91154edef5"
+    },
+    "patched_sha256": "dc4fb099cee897e02441b0317a3fcfd7ed946ce7fa88d8199fd22df2685ba7c5",
+    "original": "define GetABISuffix\n$(shell $(APK) query --fields tags --match provides $(1) | grep openwrt:abiversion | awk -F= '{print $$2; exit}')\nendef"
+  }
+]

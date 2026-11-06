@@ -34,6 +34,19 @@ func TestCacheKeyAndNames(t *testing.T) {
 
 func TestScriptTiming(t *testing.T) {
 	dir := t.TempDir()
+	assets, err := apkABIInputs()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for name, data := range assets {
+		dest := filepath.Join(dir, name)
+		if err := os.MkdirAll(filepath.Dir(dest), 0755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(dest, []byte(data), 0644); err != nil {
+			t.Fatal(err)
+		}
+	}
 	if err := os.WriteFile(filepath.Join(dir, "make"), []byte("#!/bin/sh\ncase $1 in manifest) echo 'base 1.0';; esac\n"), 0755); err != nil {
 		t.Fatal(err)
 	}
