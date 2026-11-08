@@ -212,18 +212,19 @@ async function executeBatchDelete() {
     </div>
 
     <!-- 过滤器工具栏 -->
-    <div class="flex flex-wrap items-center gap-3 p-3 rounded-lg border border-default bg-elevated/40">
+    <div class="flex flex-wrap items-center gap-3 p-3.5 rounded-xl border border-default bg-elevated/70 shadow-xs">
       <!-- 状态筛选 -->
-      <div class="w-36">
+      <div class="w-full sm:w-36">
         <USelect
           v-model="statusFilter"
           :items="statuses"
           size="sm"
+          class="w-full"
         />
       </div>
 
       <!-- 关键字搜索 -->
-      <div class="flex items-center gap-2 flex-1 min-w-[200px]">
+      <div class="flex items-center gap-2 flex-1 min-w-[200px] w-full">
         <UInput
           v-model="searchKeyword"
           placeholder="搜索 Profile 或 Hash 前缀..."
@@ -247,9 +248,10 @@ async function executeBatchDelete() {
     />
 
     <!-- 表格 -->
-    <div v-else class="rounded-lg border border-default overflow-x-auto bg-elevated/20">
-      <table class="w-full text-xs text-left">
-        <thead class="bg-muted/10 border-b border-default text-muted font-medium">
+    <div v-else class="rounded-xl border border-default overflow-hidden bg-elevated/60 shadow-xs">
+      <div class="overflow-x-auto">
+        <table class="w-full text-xs text-left min-w-[820px]">
+          <thead class="bg-muted/40 border-b border-default text-muted font-semibold">
           <tr>
             <th class="p-3 w-8">
               <input
@@ -380,6 +382,7 @@ async function executeBatchDelete() {
           </tr>
         </tbody>
       </table>
+      </div>
     </div>
 
     <!-- 分页器 -->

@@ -1,6 +1,59 @@
 @import "tailwindcss";
 @import "@nuxt/ui";
 
+@layer theme {
+  :root {
+    --ui-radius: 0.5rem;
+  }
+
+  /* 参考 ImmortalWrt / OpenWrt 固件选择器的深灰工业级质感与高对比度 */
+  .dark {
+    /* 背景色阶：深灰基底，彻底告别沉闷死黑与发蓝 */
+    --ui-bg: #18181b;
+    --ui-bg-muted: #1e1e23;
+    --ui-bg-elevated: #242429;
+    --ui-bg-accented: #2d2e36;
+    --ui-bg-inverted: #f4f4f5;
+
+    /* 边框色阶：大幅增强线框对比度，卡片边界鲜明立体 */
+    --ui-border: #3f3f46;
+    --ui-border-muted: #2e2f36;
+    --ui-border-accented: #52525b;
+    --ui-border-inverted: #ffffff;
+
+    /* 文字色阶：提升对比度，明朗通透 */
+    --ui-text: #e4e4e7;
+    --ui-text-toned: #d4d4d8;
+    --ui-text-muted: #a1a1aa;
+    --ui-text-dimmed: #71717a;
+    --ui-text-highlighted: #ffffff;
+  }
+
+  .light {
+    --ui-bg: #f8fafc;
+    --ui-bg-muted: #f1f5f9;
+    --ui-bg-elevated: #ffffff;
+    --ui-bg-accented: #e2e8f0;
+    --ui-bg-inverted: #0f172a;
+
+    --ui-border: #cbd5e1;
+    --ui-border-muted: #e2e8f0;
+    --ui-border-accented: #94a3b8;
+    --ui-border-inverted: #0f172a;
+
+    --ui-text: #334155;
+    --ui-text-toned: #1e293b;
+    --ui-text-muted: #64748b;
+    --ui-text-dimmed: #94a3b8;
+    --ui-text-highlighted: #0f172a;
+  }
+}
+
+/* 全局深色模式卡片轮廓与交互微光 */
+.dark [data-slot="root"] {
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.35);
+}
+
 /* 终端 ANSI 16 色与背景色支持 */
 .ansi-black { color: #4b5563; }
 .ansi-red { color: #ef4444; }
