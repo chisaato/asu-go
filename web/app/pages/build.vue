@@ -251,10 +251,10 @@ async function submitBuild() {
 
     <form class="space-y-6" @submit.prevent="submitBuild">
       <!-- 步骤 1: 目标平台与设备 (纯下拉与联动选择) -->
-      <UCard class="p-5 sm:p-6 space-y-5">
-        <div class="flex items-center gap-2.5 border-b border-default pb-3">
+      <UCard class="p-5 sm:p-6">
+        <div class="flex items-center gap-2.5 mb-4 sm:mb-5">
           <span class="flex size-6 items-center justify-center rounded-full bg-primary text-white text-xs font-bold">1</span>
-          <h2 class="text-sm font-semibold tracking-wide">选择发行版与设备 Profile</h2>
+          <h2 class="text-sm font-semibold tracking-wide text-highlighted">选择发行版与设备 Profile</h2>
         </div>
 
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -306,10 +306,10 @@ async function submitBuild() {
       </UCard>
 
       <!-- 步骤 2: 软件包定制 -->
-      <UCard class="p-5 sm:p-6 space-y-5">
-        <div class="flex items-center gap-2.5 border-b border-default pb-3">
+      <UCard class="p-5 sm:p-6">
+        <div class="flex items-center gap-2.5 mb-4 sm:mb-5">
           <span class="flex size-6 items-center justify-center rounded-full bg-primary text-white text-xs font-bold">2</span>
-          <h2 class="text-sm font-semibold tracking-wide">软件包定制 (Packages)</h2>
+          <h2 class="text-sm font-semibold tracking-wide text-highlighted">软件包定制 (Packages)</h2>
         </div>
 
         <PackageInput
@@ -318,12 +318,12 @@ async function submitBuild() {
         />
       </UCard>
 
-      <!-- 步骤 3: 高级构建选项 -->
-      <UCard class="p-5 sm:p-6 space-y-5">
-        <div class="flex items-center justify-between border-b border-default pb-3">
+      <!-- 步骤 3: 高级构建选项 (删除生硬切线，微卡片自然分组，协调边框无脏阴影) -->
+      <UCard class="p-5 sm:p-6">
+        <div class="flex items-center justify-between mb-4 sm:mb-5">
           <div class="flex items-center gap-2.5">
             <span class="flex size-6 items-center justify-center rounded-full bg-primary text-white text-xs font-bold">3</span>
-            <h2 class="text-sm font-semibold tracking-wide">高级定制选项</h2>
+            <h2 class="text-sm font-semibold tracking-wide text-highlighted">高级定制选项</h2>
           </div>
           <UButton
             color="neutral"
@@ -337,12 +337,14 @@ async function submitBuild() {
         </div>
 
         <div v-show="showAdvanced" class="space-y-5">
-          <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+          <!-- 核心构建微调参数网格 (直接使用标准表单项，杜绝框套框) -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <UFormField label="文件系统类型 (Filesystem)">
               <USelect
                 v-model="filesystem"
                 :items="['squashfs', 'ext4', 'initramfs']"
                 size="md"
+                class="w-full"
               />
             </UFormField>
 
@@ -352,6 +354,7 @@ async function submitBuild() {
                 type="number"
                 placeholder="例如 128 (可选)"
                 size="md"
+                class="w-full"
               />
             </UFormField>
 
@@ -364,20 +367,23 @@ async function submitBuild() {
                 ]"
                 value-key="value"
                 size="md"
+                class="w-full"
               />
+            </UFormField>
+
+            <UFormField label="增量包记录 (diff_packages)">
+              <div class="flex items-center justify-between h-9 px-3 rounded-md bg-muted/15 border border-default">
+                <span class="text-xs text-muted">仅记录增量包</span>
+                <USwitch v-model="diffPackages" size="sm" />
+              </div>
             </UFormField>
           </div>
 
-          <div class="flex items-center gap-3 p-3.5 rounded-xl border border-default bg-elevated/20">
-            <USwitch v-model="diffPackages" />
-            <div class="text-xs sm:text-sm">
-              <p class="font-medium">仅记录增量包 (diff_packages)</p>
-              <p class="text-xs text-muted">开启后生成的镜像将显式记录用户额外安装与剔除的包列表</p>
-            </div>
-          </div>
-
-          <!-- 自定义脚本 UCI defaults -->
-          <UFormField label="首次开机初始化脚本 (UCI /etc/uci-defaults)">
+          <!-- 自定义脚本 UCI defaults (直接呈现，无多余外壳) -->
+          <UFormField
+            label="首次开机初始化脚本 (UCI /etc/uci-defaults)"
+            description="构建进固件的首次开机执行命令 (Shell Script)"
+          >
             <UTextarea
               v-model="defaultsScript"
               :rows="4"
@@ -386,18 +392,18 @@ async function submitBuild() {
 uci set system.@system[0].zonename='Asia/Shanghai'
 uci commit system
 exit 0"
-              class="font-mono text-xs sm:text-sm"
+              class="font-mono text-xs w-full"
             />
           </UFormField>
 
-          <!-- 自定义 OPKG 软件源 -->
+          <!-- 自定义 OPKG 软件源与公钥 (双栏标准表单) -->
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <UFormField label="额外自定义软件源 (每行一条 URL)">
               <UTextarea
                 v-model="customRepos"
                 :rows="3"
                 placeholder="https://example.com/openwrt/packages"
-                class="font-mono text-xs sm:text-sm"
+                class="font-mono text-xs w-full"
               />
             </UFormField>
 
@@ -406,7 +412,7 @@ exit 0"
                 v-model="repoKeys"
                 :rows="3"
                 placeholder="25120xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-                class="font-mono text-xs sm:text-sm"
+                class="font-mono text-xs w-full"
               />
             </UFormField>
           </div>
@@ -414,10 +420,10 @@ exit 0"
       </UCard>
 
       <!-- 步骤 4: 实时 JSON 预览与导入导出 -->
-      <UCard class="p-5 sm:p-6 space-y-5">
-        <div class="flex items-center gap-2.5 border-b border-default pb-3">
+      <UCard class="p-5 sm:p-6">
+        <div class="flex items-center gap-2.5 mb-4 sm:mb-5">
           <span class="flex size-6 items-center justify-center rounded-full bg-primary text-white text-xs font-bold">4</span>
-          <h2 class="text-sm font-semibold tracking-wide">请求报文预览 (API Payload)</h2>
+          <h2 class="text-sm font-semibold tracking-wide text-highlighted">请求报文预览 (API Payload)</h2>
         </div>
 
         <RequestPreview

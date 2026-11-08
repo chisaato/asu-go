@@ -98,19 +98,20 @@ onMounted(() => {
 <template>
   <div class="space-y-6">
     <!-- 头部 -->
-    <div class="flex flex-wrap items-center justify-between gap-4">
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
       <div>
-        <h1 class="text-xl font-bold tracking-tight">存储与产物自治</h1>
-        <p class="text-xs text-muted">监控磁盘占用，根据 TTL 策略自动或手动清理过期固件与残留</p>
+        <h1 class="text-xl sm:text-2xl font-bold tracking-tight text-highlighted">存储与产物自治</h1>
+        <p class="text-xs text-muted mt-0.5">监控磁盘占用，根据 TTL 策略自动或手动清理过期固件与残留</p>
       </div>
 
-      <div class="flex items-center gap-2">
+      <div class="flex items-center gap-2 self-start sm:self-auto">
         <UButton
           color="neutral"
           variant="outline"
           size="sm"
           icon="i-lucide-refresh-cw"
           :loading="loading"
+          class="border-default hover:bg-muted/30"
           @click="() => { fetchOverview(); fetchArtifacts(); }"
         >
           刷新
@@ -128,56 +129,66 @@ onMounted(() => {
 
     <template v-else>
       <!-- 概览卡片 (4张) -->
-      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-4">
         <!-- 1. 产物总占用 -->
-        <UCard class="p-4">
-          <div class="flex items-center justify-between text-muted text-xs">
-            <span>固件产物总占用</span>
-            <UIcon name="i-lucide-folder-archive" class="size-4 text-primary" />
+        <div class="rounded-xl border border-default bg-elevated/70 p-4 sm:p-5 flex flex-col justify-between hover:border-default-accented transition-all">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-medium text-muted">固件产物总占用</span>
+            <div class="p-1.5 rounded-lg bg-emerald-500/10 text-emerald-400">
+              <UIcon name="i-lucide-folder-archive" class="size-4" />
+            </div>
           </div>
-          <div class="mt-2 text-2xl font-bold font-mono">
+          <div class="mt-2.5 text-2xl sm:text-3xl font-bold font-mono tracking-tight text-highlighted">
             {{ formatBytes(overview?.artifacts?.bytes) }}
           </div>
-          <p class="mt-1 text-xs text-muted">
+          <p class="mt-1.5 text-xs text-muted truncate">
             共计 {{ overview?.artifacts?.count ?? 0 }} 个构建产物包
           </p>
-        </UCard>
+        </div>
 
         <!-- 2. 孤儿与临时占用 -->
-        <UCard class="p-4">
-          <div class="flex items-center justify-between text-muted text-xs">
-            <span>孤儿与残留目录</span>
-            <UIcon name="i-lucide-trash" class="size-4 text-warning" />
+        <div class="rounded-xl border border-default bg-elevated/70 p-4 sm:p-5 flex flex-col justify-between hover:border-default-accented transition-all">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-medium text-muted">孤儿与残留目录</span>
+            <div class="p-1.5 rounded-lg bg-amber-500/10 text-amber-400">
+              <UIcon name="i-lucide-trash" class="size-4" />
+            </div>
           </div>
-          <div class="mt-2 text-2xl font-bold font-mono">
+          <div
+            class="mt-2.5 text-2xl sm:text-3xl font-bold font-mono tracking-tight"
+            :class="(overview?.orphans?.bytes ?? 0) > 0 ? 'text-amber-400' : 'text-highlighted'"
+          >
             {{ formatBytes(overview?.orphans?.bytes) }}
           </div>
-          <p class="mt-1 text-xs text-muted">
+          <p class="mt-1.5 text-xs text-muted truncate">
             检测到 {{ overview?.orphans?.count ?? 0 }} 个无主残留目录
           </p>
-        </UCard>
+        </div>
 
         <!-- 3. 最近一次清理 -->
-        <UCard class="p-4">
-          <div class="flex items-center justify-between text-muted text-xs">
-            <span>最近清理活动</span>
-            <UIcon name="i-lucide-sparkles" class="size-4 text-success" />
+        <div class="rounded-xl border border-default bg-elevated/70 p-4 sm:p-5 flex flex-col justify-between hover:border-default-accented transition-all">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-medium text-muted">最近清理活动</span>
+            <div class="p-1.5 rounded-lg bg-sky-500/10 text-sky-400">
+              <UIcon name="i-lucide-sparkles" class="size-4" />
+            </div>
           </div>
-          <div class="mt-2 text-base font-bold font-mono truncate">
+          <div class="mt-2.5 text-lg sm:text-xl font-bold font-mono text-highlighted truncate">
             {{ overview?.last_clean ? relativeTime(overview.last_clean.at) : '暂无清理记录' }}
           </div>
-          <p v-if="overview?.last_clean" class="mt-1 text-xs text-success">
+          <p v-if="overview?.last_clean" class="mt-1.5 text-xs text-emerald-400 truncate font-medium">
             释放了 {{ formatBytes(overview.last_clean.freed_bytes) }} ({{ overview.last_clean.removed }} 项)
           </p>
-          <p v-else class="mt-1 text-xs text-muted">尚未触发自动化清理</p>
-        </UCard>
+          <p v-else class="mt-1.5 text-xs text-muted">尚未触发自动化清理</p>
+        </div>
 
         <!-- 4. 清理操作入口 -->
-        <UCard class="p-4 flex flex-col justify-between">
-          <div class="text-xs font-semibold text-default">
-            快速清理操作
+        <div class="rounded-xl border border-default bg-elevated/70 p-4 sm:p-5 flex flex-col justify-between hover:border-default-accented transition-all">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-semibold text-highlighted">快速清理操作</span>
+            <UIcon name="i-lucide-sliders" class="size-4 text-muted" />
           </div>
-          <div class="flex flex-wrap gap-1.5 mt-2">
+          <div class="flex flex-wrap gap-1.5 mt-2.5">
             <UButton
               color="primary"
               variant="soft"
@@ -206,147 +217,191 @@ onMounted(() => {
               清理孤儿
             </UButton>
           </div>
-        </UCard>
+          <p class="mt-2 text-[11px] text-muted">根据保留策略即时回收</p>
+        </div>
       </div>
 
-      <!-- TTL 策略卡（只读） -->
-      <UCard class="p-4">
-        <div class="flex items-center justify-between mb-2">
-          <h2 class="text-xs font-semibold text-muted flex items-center gap-1.5">
-            <UIcon name="i-lucide-shield-alert" class="size-3.5" />
-            <span>当前生效的生命周期策略 (TTL Policy)</span>
-          </h2>
-          <span class="text-[10px] text-muted">修改请编辑配置文件并重启服务</span>
+      <!-- TTL 策略卡（系统设置风格大卡片：字大点、框立体独立、说明清晰） -->
+      <div class="rounded-xl border border-default bg-elevated/70 overflow-hidden">
+        <div class="flex flex-wrap items-center justify-between gap-2 p-4 sm:px-5 border-b border-default bg-muted/20">
+          <div class="flex items-center gap-2.5">
+            <div class="p-1.5 rounded-lg bg-amber-500/10 text-amber-400">
+              <UIcon name="i-lucide-hourglass" class="size-4 sm:size-5" />
+            </div>
+            <div>
+              <h2 class="text-sm font-semibold text-highlighted">生命周期保留策略 (TTL Policy)</h2>
+              <p class="text-[11px] text-muted">监控服务根据此策略自动定时轮询与回收磁盘产物</p>
+            </div>
+          </div>
+          <UBadge color="neutral" variant="subtle" size="xs" class="font-mono border-default">
+            只读策略 · 配置文件生效
+          </UBadge>
         </div>
-        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
-          <div class="p-2.5 rounded-lg border border-default bg-elevated/40">
-            <span class="text-muted text-[10px]">通用默认保留期 (defaults)</span>
-            <p class="font-mono font-bold mt-1">{{ overview?.ttl?.defaults || '7d' }}</p>
-          </div>
-          <div class="p-2.5 rounded-lg border border-default bg-elevated/40">
-            <span class="text-muted text-[10px]">版本化镜像保留期 (versioned)</span>
-            <p class="font-mono font-bold mt-1">{{ overview?.ttl?.versioned || '30d' }}</p>
-          </div>
-          <div class="p-2.5 rounded-lg border border-default bg-elevated/40">
-            <span class="text-muted text-[10px]">失败任务残留清理 (failed)</span>
-            <p class="font-mono font-bold mt-1">{{ overview?.ttl?.failed || '1d' }}</p>
-          </div>
-          <div class="p-2.5 rounded-lg border border-default bg-elevated/40">
-            <span class="text-muted text-[10px]">诊断容器保留 (purge_at)</span>
-            <p class="font-mono font-bold mt-1">{{ overview?.ttl?.purge_at || '24h' }}</p>
+
+        <div class="p-4 sm:p-5">
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+            <!-- 1. 通用默认保留期 -->
+            <div class="rounded-xl border border-default bg-background/80 dark:bg-zinc-900/60 p-4 hover:border-default-accented transition-colors">
+              <div class="flex items-center gap-2 text-muted text-xs font-medium">
+                <UIcon name="i-lucide-clock" class="size-4 text-sky-400" />
+                <span>通用默认保留期 (defaults)</span>
+              </div>
+              <p class="font-mono font-black text-xl sm:text-2xl text-highlighted mt-2 tracking-tight">
+                {{ overview?.ttl?.defaults || '7d' }}
+              </p>
+              <p class="text-[11px] text-muted mt-1.5">未声明类型的普通构建镜像</p>
+            </div>
+
+            <!-- 2. 版本化镜像保留期 -->
+            <div class="rounded-xl border border-default bg-background/80 dark:bg-zinc-900/60 p-4 hover:border-default-accented transition-colors">
+              <div class="flex items-center gap-2 text-muted text-xs font-medium">
+                <UIcon name="i-lucide-shield-check" class="size-4 text-emerald-400" />
+                <span>版本化镜像保留期 (versioned)</span>
+              </div>
+              <p class="font-mono font-black text-xl sm:text-2xl text-highlighted mt-2 tracking-tight">
+                {{ overview?.ttl?.versioned || '30d' }}
+              </p>
+              <p class="text-[11px] text-muted mt-1.5">正式版 Release 固件长期留存</p>
+            </div>
+
+            <!-- 3. 失败任务残留清理 -->
+            <div class="rounded-xl border border-default bg-background/80 dark:bg-zinc-900/60 p-4 hover:border-default-accented transition-colors">
+              <div class="flex items-center gap-2 text-muted text-xs font-medium">
+                <UIcon name="i-lucide-alert-triangle" class="size-4 text-red-400" />
+                <span>失败任务残留清理 (failed)</span>
+              </div>
+              <p class="font-mono font-black text-xl sm:text-2xl text-highlighted mt-2 tracking-tight">
+                {{ overview?.ttl?.failed || '1d' }}
+              </p>
+              <p class="text-[11px] text-muted mt-1.5">超时或失败任务产物快速回收</p>
+            </div>
+
+            <!-- 4. 诊断容器保留 -->
+            <div class="rounded-xl border border-default bg-background/80 dark:bg-zinc-900/60 p-4 hover:border-default-accented transition-colors">
+              <div class="flex items-center gap-2 text-muted text-xs font-medium">
+                <UIcon name="i-lucide-container" class="size-4 text-purple-400" />
+                <span>诊断容器保留期 (purge_at)</span>
+              </div>
+              <p class="font-mono font-black text-xl sm:text-2xl text-highlighted mt-2 tracking-tight">
+                {{ overview?.ttl?.purge_at || '24h' }}
+              </p>
+              <p class="text-[11px] text-muted mt-1.5">保留失败容器以便命令行调试</p>
+            </div>
           </div>
         </div>
-      </UCard>
+      </div>
 
       <!-- 产物列表表格 -->
       <section class="space-y-3">
-        <h2 class="text-sm font-semibold">磁盘固件产物列表</h2>
+        <h2 class="text-sm font-semibold text-highlighted">磁盘固件产物列表</h2>
 
-        <div class="rounded-lg border border-default overflow-x-auto bg-elevated/20">
-          <table class="w-full text-xs text-left">
-            <thead class="bg-muted/10 border-b border-default text-muted font-medium">
-              <tr>
-                <th class="p-3 w-8" />
-                <th class="p-3">Profile / 设备型号</th>
-                <th class="p-3">发行版 / 目标</th>
-                <th class="p-3">产物大小</th>
-                <th class="p-3">文件数</th>
-                <th class="p-3">生成时间</th>
-                <th class="p-3">过期时间</th>
-                <th class="p-3 text-right">操作</th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-default">
-              <template v-for="item in artifacts" :key="item.request_hash">
-                <tr class="hover:bg-muted/5 transition-colors">
-                  <!-- 展开按钮 -->
-                  <td class="p-3">
-                    <button
-                      type="button"
-                      class="text-muted hover:text-default cursor-pointer"
-                      :title="expandedRows.has(item.request_hash) ? '收起文件清单' : '展开文件清单'"
-                      @click="toggleExpand(item.request_hash)"
-                    >
-                      <UIcon
-                        :name="expandedRows.has(item.request_hash) ? 'i-lucide-chevron-down' : 'i-lucide-chevron-right'"
-                        class="size-4"
-                      />
-                    </button>
-                  </td>
+        <div class="rounded-xl border border-default overflow-hidden bg-elevated/60 shadow-xs">
+          <div class="overflow-x-auto">
+            <table class="w-full text-xs text-left min-w-[760px]">
+              <thead class="bg-muted/40 border-b border-default text-muted font-semibold">
+                <tr>
+                  <th class="p-3 w-8" />
+                  <th class="p-3">Profile / 设备型号</th>
+                  <th class="p-3">发行版 / 目标</th>
+                  <th class="p-3">产物大小</th>
+                  <th class="p-3">文件数</th>
+                  <th class="p-3">生成时间</th>
+                  <th class="p-3">过期时间</th>
+                  <th class="p-3 text-right">操作</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-default">
+                <template v-for="item in artifacts" :key="item.request_hash">
+                  <tr class="hover:bg-muted/15 transition-colors">
+                    <!-- 展开按钮 -->
+                    <td class="p-3">
+                      <button
+                        type="button"
+                        class="text-muted hover:text-default cursor-pointer"
+                        :title="expandedRows.has(item.request_hash) ? '收起文件清单' : '展开文件清单'"
+                        @click="toggleExpand(item.request_hash)"
+                      >
+                        <UIcon
+                          :name="expandedRows.has(item.request_hash) ? 'i-lucide-chevron-down' : 'i-lucide-chevron-right'"
+                          class="size-4"
+                        />
+                      </button>
+                    </td>
 
-                  <!-- 设备型号 -->
-                  <td class="p-3 font-semibold text-default">
-                    {{ item.profile }}
-                    <div class="text-[10px] text-muted font-mono">{{ item.request_hash }}</div>
-                  </td>
+                    <!-- 设备型号 -->
+                    <td class="p-3 font-semibold text-highlighted">
+                      {{ item.profile }}
+                      <div class="text-[10px] text-muted font-mono">{{ item.request_hash }}</div>
+                    </td>
 
-                  <!-- 发行版 -->
-                  <td class="p-3 text-muted">
-                    {{ item.distro }} · {{ item.version }} · {{ item.target }}
-                  </td>
+                    <!-- 发行版 -->
+                    <td class="p-3 text-muted">
+                      {{ item.distro }} · {{ item.version }} · {{ item.target }}
+                    </td>
 
-                  <!-- 大小 -->
-                  <td class="p-3 font-mono font-medium">
-                    {{ formatBytes(item.bytes) }}
-                  </td>
+                    <!-- 大小 -->
+                    <td class="p-3 font-mono font-medium text-highlighted">
+                      {{ formatBytes(item.bytes) }}
+                    </td>
 
-                  <!-- 文件数 -->
-                  <td class="p-3 text-muted font-mono">
-                    {{ item.files.length }} 个文件
-                  </td>
+                    <!-- 文件数 -->
+                    <td class="p-3 text-muted font-mono">
+                      {{ item.files.length }} 个文件
+                    </td>
 
-                  <!-- 生成时间 -->
-                  <td class="p-3 text-muted" :title="absoluteTime(item.created_at)">
-                    {{ relativeTime(item.created_at) }}
-                  </td>
+                    <!-- 生成时间 -->
+                    <td class="p-3 text-muted" :title="absoluteTime(item.created_at)">
+                      {{ relativeTime(item.created_at) }}
+                    </td>
 
-                  <!-- 过期时间 -->
-                  <td class="p-3 text-muted" :title="absoluteTime(item.expires_at)">
-                    {{ item.expires_at ? relativeTime(item.expires_at) : '永久保留' }}
-                  </td>
+                    <!-- 过期时间 -->
+                    <td class="p-3 text-muted" :title="absoluteTime(item.expires_at)">
+                      {{ item.expires_at ? relativeTime(item.expires_at) : '永久保留' }}
+                    </td>
 
-                  <!-- 操作 -->
-                  <td class="p-3 text-right">
-                    <UButton
-                      color="error"
-                      variant="ghost"
-                      size="xs"
-                      icon="i-lucide-trash-2"
-                      @click="confirmDeleteItem(item.request_hash)"
-                    >
-                      删除
-                    </UButton>
+                    <!-- 操作 -->
+                    <td class="p-3 text-right">
+                      <UButton
+                        color="error"
+                        variant="ghost"
+                        size="xs"
+                        icon="i-lucide-trash-2"
+                        @click="confirmDeleteItem(item.request_hash)"
+                      >
+                        删除
+                      </UButton>
+                    </td>
+                  </tr>
+
+                  <!-- 展开的详细文件清单 -->
+                  <tr v-if="expandedRows.has(item.request_hash)" class="bg-muted/10">
+                    <td colspan="8" class="p-3 pl-12">
+                      <p class="text-[11px] font-medium text-muted mb-1.5">包含的文件清单：</p>
+                      <ul class="space-y-1 font-mono text-xs">
+                        <li v-for="file in item.files" :key="file" class="flex items-center gap-2">
+                          <UIcon name="i-lucide-file-archive" class="size-3.5 text-muted" />
+                          <NuxtLink
+                            :to="`/store/${item.request_hash}/${file}`"
+                            target="_blank"
+                            class="hover:underline text-primary"
+                          >
+                            {{ file }}
+                          </NuxtLink>
+                        </li>
+                      </ul>
+                    </td>
+                  </tr>
+                </template>
+
+                <!-- 空态 -->
+                <tr v-if="artifacts.length === 0">
+                  <td colspan="8" class="p-12 text-center">
+                    <EmptyState title="暂无固件产物记录" description="所有构建产物已清理或尚未产生" />
                   </td>
                 </tr>
-
-                <!-- 展开的详细文件清单 -->
-                <tr v-if="expandedRows.has(item.request_hash)" class="bg-muted/5">
-                  <td colspan="8" class="p-3 pl-12">
-                    <p class="text-[11px] font-medium text-muted mb-1.5">包含的文件清单：</p>
-                    <ul class="space-y-1 font-mono text-xs">
-                      <li v-for="file in item.files" :key="file" class="flex items-center gap-2">
-                        <UIcon name="i-lucide-file-archive" class="size-3.5 text-muted" />
-                        <NuxtLink
-                          :to="`/store/${item.request_hash}/${file}`"
-                          target="_blank"
-                          class="hover:underline text-primary"
-                        >
-                          {{ file }}
-                        </NuxtLink>
-                      </li>
-                    </ul>
-                  </td>
-                </tr>
-              </template>
-
-              <!-- 空态 -->
-              <tr v-if="artifacts.length === 0">
-                <td colspan="8" class="p-12 text-center">
-                  <EmptyState title="暂无固件产物记录" description="所有构建产物已清理或尚未产生" />
-                </td>
-              </tr>
-            </tbody>
-          </table>
+              </tbody>
+            </table>
+          </div>
         </div>
       </section>
     </template>

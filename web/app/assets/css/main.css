@@ -49,11 +49,6 @@
   }
 }
 
-/* 全局深色模式卡片轮廓与交互微光 */
-.dark [data-slot="root"] {
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.35);
-}
-
 /* 终端 ANSI 16 色与背景色支持 */
 .ansi-black { color: #4b5563; }
 .ansi-red { color: #ef4444; }
