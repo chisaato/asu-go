@@ -24,9 +24,24 @@ admin:
   #   - name: admin
   #     password_hash: '$2a$...'
   users: null
-  # 为空则启动生成随机密钥并警告，重启后已有会话失效。生产环境应配置随机长密钥。
+  # 为空则启动时在数据目录持久化生成签名密钥（jwt-signing.key）；重启后会话依然有效。生产环境亦可显式配置。
   session_secret: ""
   session_ttl: 24h
+  access_token_ttl: 15m
+  refresh_token_ttl: 720h
+  refresh_absolute_ttl: 2160h
+  # 单 OIDC Provider 配置；未启用时不显示外部登录。
+  oidc:
+    enabled: false
+    issuer: ""
+    client_id: ""
+    client_secret: ""
+    redirect_url: ""
+    scopes:
+      - openid
+      - profile
+      - email
+    button_text: "使用 SSO 登录"
 queue:
   driver: sqlite
   max_concurrent_builds: 2

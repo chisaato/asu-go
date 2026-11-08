@@ -38,4 +38,30 @@ describe('管理 API', () => {
     await expect(useAdminApi()('/jobs')).rejects.toEqual({ status: 500 })
     expect(navigate).not.toHaveBeenCalled()
   })
+
+  it('401 时静默刷新成功后重发原始请求', async () => {
+    const navigate = vi.fn()
+    vi.stubGlobal('navigateTo', navigate)
+    let jobsCalled = 0
+    const mockFetch = vi.fn().mockImplementation((url: string) => {
+      if (url === '/admin/api/jobs') {
+        jobsCalled++
+        if (jobsCalled === 1) {
+          return Promise.reject({ status: 401 })
+        }
+        return Promise.resolve({ jobs: ['item1'] })
+      }
+      if (url === '/admin/api/auth/refresh') {
+        return Promise.resolve({ ok: true })
+      }
+      return Promise.reject(new Error('not found'))
+    })
+    vi.stubGlobal('$fetch', mockFetch)
+
+    const result = await useAdminApi()('/jobs')
+    expect(result).toEqual({ jobs: ['item1'] })
+    expect(mockFetch).toHaveBeenCalledWith('/admin/api/auth/refresh', expect.anything())
+    expect(jobsCalled).toBe(2)
+    expect(navigate).not.toHaveBeenCalled()
+  })
 })

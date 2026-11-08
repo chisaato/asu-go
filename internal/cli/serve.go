@@ -77,7 +77,7 @@ func runServe(parent context.Context, cfg config.Config) error {
 	router.Use(cors.New(cfg.Server.CORS))
 	public := []gin.IRouter{router, router.Group("/:distro")}
 	webui.Register(router)
-	adminGroup, err := admin.RegisterAuth(router, cfg.Admin, logger)
+	adminGroup, err := admin.RegisterAuth(router, cfg.Admin, logger, admin.WithDataDir(cfg.DataDir), admin.WithDB(database.DB))
 	if err != nil {
 		return err
 	}

@@ -56,10 +56,24 @@ type Log struct {
 }
 
 type Admin struct {
-	APIToken      string        `yaml:"api_token"`
-	Users         []AdminUser   `yaml:"users"`
-	SessionSecret string        `yaml:"session_secret"`
-	SessionTTL    time.Duration `yaml:"session_ttl"`
+	APIToken           string        `yaml:"api_token"`
+	Users              []AdminUser   `yaml:"users"`
+	SessionSecret      string        `yaml:"session_secret"`
+	SessionTTL         time.Duration `yaml:"session_ttl"`
+	AccessTokenTTL     time.Duration `yaml:"access_token_ttl"`
+	RefreshTokenTTL    time.Duration `yaml:"refresh_token_ttl"`
+	RefreshAbsoluteTTL time.Duration `yaml:"refresh_absolute_ttl"`
+	OIDC               OIDC          `yaml:"oidc"`
+}
+
+type OIDC struct {
+	Enabled      bool     `yaml:"enabled"`
+	Issuer       string   `yaml:"issuer"`
+	ClientID     string   `yaml:"client_id"`
+	ClientSecret string   `yaml:"client_secret"`
+	RedirectURL  string   `yaml:"redirect_url"`
+	Scopes       []string `yaml:"scopes"`
+	ButtonText   string   `yaml:"button_text"`
 }
 
 type AdminUser struct {
@@ -158,7 +172,16 @@ func Default() Config {
 		Server:      Server{Listen: ":8000", DefaultDistro: "openwrt", CORS: CORS{PublicOrigins: []string{"*"}, AdminOrigins: []string{}}},
 		Log:         Log{Format: "json", Level: "info"},
 		DataDir:     "data",
-		Admin:       Admin{SessionTTL: 24 * time.Hour},
+		Admin: Admin{
+			SessionTTL:         24 * time.Hour,
+			AccessTokenTTL:     15 * time.Minute,
+			RefreshTokenTTL:    30 * 24 * time.Hour,
+			RefreshAbsoluteTTL: 90 * 24 * time.Hour,
+			OIDC: OIDC{
+				Scopes:     []string{"openid", "profile", "email"},
+				ButtonText: "使用 SSO 登录",
+			},
+		},
 		Queue:       Queue{Driver: "sqlite", MaxConcurrentBuilds: 2, MaxPendingJobs: 200, JobTimeout: 10 * time.Minute, BuildTTL: 7 * 24 * time.Hour, BuildUnversionedTTL: 24 * time.Hour, BuildDefaultsTTL: 30 * time.Minute, BuildFailureTTL: time.Hour},
 		Build:       Build{MaxDefaultsLength: 20480, MaxCustomRootfsSizeMB: 1024},
 		Store:       Store{Driver: "local"},
@@ -332,6 +355,9 @@ func (c Config) Validate() error {
 		"runtime.rolling_recheck":        c.Runtime.RollingRecheck,
 		"runtime.scavenger_interval":     c.Runtime.ScavengerInterval,
 		"admin.session_ttl":              c.Admin.SessionTTL,
+		"admin.access_token_ttl":         c.Admin.AccessTokenTTL,
+		"admin.refresh_token_ttl":        c.Admin.RefreshTokenTTL,
+		"admin.refresh_absolute_ttl":     c.Admin.RefreshAbsoluteTTL,
 		"queue.job_timeout":              c.Queue.JobTimeout,
 		"queue.build_ttl":                c.Queue.BuildTTL,
 		"queue.build_unversioned_ttl":    c.Queue.BuildUnversionedTTL,
@@ -366,6 +392,17 @@ func (c Config) Validate() error {
 	}
 	if c.Runtime.CPUs < 0 {
 		return errors.New("runtime.cpus: 不得小于 0")
+	}
+	if c.Admin.OIDC.Enabled {
+		if strings.TrimSpace(c.Admin.OIDC.Issuer) == "" {
+			return errors.New("admin.oidc.issuer: 不得为空")
+		}
+		if strings.TrimSpace(c.Admin.OIDC.ClientID) == "" {
+			return errors.New("admin.oidc.client_id: 不得为空")
+		}
+		if strings.TrimSpace(c.Admin.OIDC.ClientSecret) == "" {
+			return errors.New("admin.oidc.client_secret: 不得为空")
+		}
 	}
 	return nil
 }
